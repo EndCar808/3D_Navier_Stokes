@@ -18,6 +18,10 @@
 #include <fftw3-mpi.h>
 #define __FFTW3
 #endif
+#ifndef __OPENMP
+#include <omp.h> 
+#define __OPENMP
+#endif
 	
 #include <gsl/gsl_histogram.h> 
 #include <gsl/gsl_statistics.h>
@@ -123,6 +127,8 @@
 #define MIN_STEP_SIZE 1e-10 	// The minimum allowed stepsize for the solver 
 #define MAX_ITERS 1e+12			// The maximum iterations to perform
 #define MAX_VORT_LIM 1e+100     // The maximum allowed vorticity
+// Initial Condition Parameters
+#define KAPPA 1.0               // The wavenumber for the Taylor Green vortex intial condition
 // ---------------------------------------------------------------------
 //  Global Struct Definitions
 // ---------------------------------------------------------------------
@@ -135,9 +141,10 @@ typedef struct system_vars_struct {
 	fftw_plan fftw_3d_dft_c2r;					// FFTW plan to perform transform from Fourier to Real
 	fftw_plan fftw_3d_dft_batch_r2c;			// FFTW plan to perform a batch transform from Real to Fourier
 	fftw_plan fftw_3d_dft_batch_c2r;			// FFTW plan to perform a batch transform from Fourier to Real
+	fftw_plan fftw_3d_dft_trans_batch_r2c;		// FFTW plan to perform a transposed batch transform from Real to Fourier
+	fftw_plan fftw_3d_dft_trans_batch_c2r;		// FFTW plan to perform a transposed batch transform from Fourier to Real
 	ptrdiff_t alloc_local;						// Variable to hold size of memory to allocate for local (on process) arrays for normal transform
 	ptrdiff_t alloc_local_batch;				// Variable to hold size of memory to allocate for local (on process) arrays for batch transform
-	ptrdiff_t alloc_local_transpose_batch;		// Variable to hold size of memory to allocate for local (on process) arrays for batch transform
 	ptrdiff_t local_Nx;							// Size of the first dimension for the local arrays
 	ptrdiff_t local_Nx_start;					// Position where the local arrays start in the undistributed array
 	int num_procs;								// Variable to hold the number of active provcesses
