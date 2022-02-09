@@ -22,9 +22,13 @@
 // ---------------------------------------------------------------------
 // Main function for the pseudospectral solver
 void SpectralSolve(void);
+#if defined(__RK4)
+void RK4Step(const double dt, const long int* N, const ptrdiff_t local_Nx, RK_data_struct* RK_data);
+#endif
+void NonlinearRHSBatch(fftw_complex* u_hat, fftw_complex* dw_hat_dt, double* curl, double* u, double* vort);
 void InitializeSystemMeasurables(RK_data_struct* RK_data);
 void InitializeIntegrationVariables(double* t0, double* t, double* dt, double* T, long int* trans_steps);
-void InitialConditions(fftw_complex* w_hat, double* u, fftw_complex* u_hat, const long int* N);
+void InitialConditions(fftw_complex* u_hat, double* u, const long int* N);
 void ApplyDealiasing(fftw_complex* array, int array_dim, const long int* N);
 void InitializeSpaceVariables(double** x, int** k, const long int* N);
 void InitializeFFTWPlans(const long int* N, const long int* NTBatch);

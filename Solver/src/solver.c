@@ -77,7 +77,7 @@ void SpectralSolve(void) {
 	PrintSpaceVariables(N);
 
 	// Get initial conditions
-	InitialConditions(run_data->w_hat, run_data->u, run_data->u_hat, N);
+	InitialConditions(run_data->u_hat, run_data->u, N);
 
 	// -------------------------------
 	// Integration Variables
@@ -90,7 +90,7 @@ void SpectralSolve(void) {
 	long int trans_steps;
 
 	// Get timestep and other integration variables
-	// InitializeIntegrationVariables(&t0, &t, &dt, &T, &trans_steps);
+	InitializeIntegrationVariables(&t0, &t, &dt, &T, &trans_steps);
 	
 	// -------------------------------
 	// Create & Open Output File
@@ -146,6 +146,217 @@ void SpectralSolve(void) {
 	// Clean Up 
 	// -------------------------------
 	FreeMemory(RK_data);
+}
+/**
+ * Function to perform one step using the 4th order Runge-Kutta method
+ * @param dt       The current timestep of the system
+ * @param N        Array containing the dimensions of the system
+ * @param local_Nx Int indicating the local size of the first dimension of the arrays	
+ * @param RK_data  Struct pointing the Integration variables: stages, tmp arrays, rhs and arrays needed for NonlinearRHS function
+ */
+#if defined(__RK4)
+void RK4Step(const double dt, const long int* N, const ptrdiff_t local_Nx, RK_data_struct* RK_data) {
+
+	// Initialize vairables
+	int tmp1, tmp2;
+	int indx;
+	const long int Ny 		  = N[1];
+	const long int Nz_Fourier = N[2] / 2 + 1;
+	#if defined(__NAVIER)
+	double k_sqr;
+	double D_fac;
+	#endif
+
+
+	/////////////////////
+	/// RK STAGES
+	/////////////////////
+	// ----------------------- Stage 1
+	NonlinearRHSBatch(run_data->u_hat, RK_data->RK1, RK_data->curl, RK_data->vel, RK_data->vort);
+	for (int i = 0; i < local_Nx; ++i) {
+		tmp1 = i * Ny;
+		for (int j = 0; j < Ny; ++j) {
+			tmp2 = Nz_Fourier * (tmp1 + j);
+			for (int k = 0; k < Nz_Fourier; ++k) {
+				indx = tmp2 + k;
+
+				// Update temporary input for nonlinear term
+				RK_data->RK_tmp[SYS_DIM * indx + 0] = run_data->u_hat[SYS_DIM * indx + 0] + dt * RK4_A21 * RK_data->RK1[SYS_DIM * indx + 0];
+				RK_data->RK_tmp[SYS_DIM * indx + 1] = run_data->u_hat[SYS_DIM * indx + 1] + dt * RK4_A21 * RK_data->RK1[SYS_DIM * indx + 1];
+				RK_data->RK_tmp[SYS_DIM * indx + 2] = run_data->u_hat[SYS_DIM * indx + 2] + dt * RK4_A21 * RK_data->RK1[SYS_DIM * indx + 2];
+			}
+		}
+	}
+	// ----------------------- Stage 2
+	NonlinearRHSBatch(RK_data->RK_tmp, RK_data->RK2, RK_data->curl, RK_data->vel, RK_data->vort);
+	for (int i = 0; i < local_Nx; ++i) {
+		tmp1 = i * Ny;
+		for (int j = 0; j < Ny; ++j) {
+			tmp2 = Nz_Fourier * (tmp1 + j);
+			for (int k = 0; k < Nz_Fourier; ++k) {
+				indx = tmp2 + k;
+
+				// Update temporary input for nonlinear term
+				RK_data->RK_tmp[SYS_DIM * indx + 0] = run_data->u_hat[SYS_DIM * indx + 0] + dt * RK4_A32 * RK_data->RK2[SYS_DIM * indx + 0];
+				RK_data->RK_tmp[SYS_DIM * indx + 1] = run_data->u_hat[SYS_DIM * indx + 1] + dt * RK4_A32 * RK_data->RK2[SYS_DIM * indx + 1];
+				RK_data->RK_tmp[SYS_DIM * indx + 2] = run_data->u_hat[SYS_DIM * indx + 2] + dt * RK4_A32 * RK_data->RK2[SYS_DIM * indx + 2];
+			}
+		}
+	}
+	// ----------------------- Stage 3
+	NonlinearRHSBatch(RK_data->RK_tmp, RK_data->RK3, RK_data->curl, RK_data->vel, RK_data->vort);
+	for (int i = 0; i < local_Nx; ++i) {
+		tmp1 = i * Ny;
+		for (int j = 0; j < Ny; ++j) {
+			tmp2 = Nz_Fourier * (tmp1 + j);
+			for (int k = 0; k < Nz_Fourier; ++k) {
+				indx = tmp2 + k;
+
+				// Update temporary input for nonlinear term
+				RK_data->RK_tmp[SYS_DIM * indx + 0] = run_data->u_hat[SYS_DIM * indx + 0] + dt * RK4_A43 * RK_data->RK3[SYS_DIM * indx + 0];
+				RK_data->RK_tmp[SYS_DIM * indx + 1] = run_data->u_hat[SYS_DIM * indx + 1] + dt * RK4_A43 * RK_data->RK3[SYS_DIM * indx + 1];
+				RK_data->RK_tmp[SYS_DIM * indx + 2] = run_data->u_hat[SYS_DIM * indx + 2] + dt * RK4_A43 * RK_data->RK3[SYS_DIM * indx + 2];
+			}
+		}
+	}
+	// ----------------------- Stage 4
+	NonlinearRHSBatch(RK_data->RK_tmp, RK_data->RK4, RK_data->curl, RK_data->vel, RK_data->vort);
+	
+	
+	/////////////////////
+	/// UPDATE STEP
+	/////////////////////
+	for (int i = 0; i < local_Nx; ++i) {
+		tmp1 = i * Ny;
+		for (int j = 0; j < Ny; ++j) {
+			tmp2 = Nz_Fourier * (tmp1 + j);
+			for (int k = 0; k < Nz_Fourier; ++k) {
+				indx = tmp2 + k;
+
+				#if defined(__EULER)
+				// Update Fourier vorticity with the RHS
+				run_data->w_hat[indx] = run_data->w_hat[indx] + (dt * (RK4_B1 * RK_data->RK1[indx]) + dt * (RK4_B2 * RK_data->RK2[indx]) + dt * (RK4_B3 * RK_data->RK3[indx]) + dt * (RK4_B4 * RK_data->RK4[indx]));
+				#elif defined(__NAVIER)
+				// Compute the pre factors for the RK4CN update step
+				k_sqr = (double) (run_data->k[0][i] * run_data->k[0][i] + run_data->k[1][j] * run_data->k[1][j]);
+				
+				#if defined(HYPER_VISC) && defined(EKMN_DRAG) 
+				// Both Hyperviscosity and Ekman drag
+				D_fac = dt * (sys_vars->NU * pow(k_sqr, VIS_POW) + sys_vars->EKMN_ALPHA * pow(k_sqr, EKMN_POW)); 
+				#elif !defined(HYPER_VISC) && defined(EKMN_DRAG) 
+				// No hyperviscosity but we have Ekman drag
+				D_fac = dt * (sys_vars->NU * k_sqr + sys_vars->EKMN_ALPHA * pow(k_sqr, EKMN_POW)); 
+				#elif defined(HYPER_VISC) && !defined(EKMN_DRAG) 
+				// Hyperviscosity only
+				D_fac = dt * (sys_vars->NU * pow(k_sqr, VIS_POW)); 
+				#else 
+				// No hyper viscosity or no ekman drag -> just normal viscosity
+				D_fac = dt * (sys_vars->NU * k_sqr); 
+				#endif
+
+				// Update Fourier vorticity
+				run_data->w_hat[indx] = run_data->w_hat[indx] * ((2.0 - D_fac) / (2.0 + D_fac)) + (2.0 * dt / (2.0 + D_fac)) * (RK4_B1 * RK_data->RK1[indx] + RK4_B2 * RK_data->RK2[indx] + RK4_B3 * RK_data->RK3[indx] + RK4_B4 * RK_data->RK4[indx]);
+				#endif
+			}
+		}
+	}
+}
+#endif
+/**
+ * Function that performs the evluation of the nonlinear term by transforming the velocity and vorticityback to real space where 
+ * curl is performed before transforming back to Fourier space. Dealiasing is applied to the result
+ * 
+ * @param u_hat     Input array: contains the current Fourier velocity of the system
+ * @param dw_hat_dt Output array: Contains the result of the dealiased nonlinear term. Also used as an intermediate array to save memory
+ * @param curl      Array to hold the curl of velocity and vorticity in Real Space
+ * @param u         Array to hold the real space velocities
+ * @param vort      Array to hold the real space vorticity derivatives
+ */
+void NonlinearRHSBatch(fftw_complex* u_hat, fftw_complex* dw_hat_dt, double* curl, double* u, double* vort) {
+
+	// Initialize variables
+	int tmp1, tmp2, indx;
+	const ptrdiff_t local_Nx  = sys_vars->local_Nx;
+	const long int Nx         = sys_vars->N[0];
+	const long int Ny         = sys_vars->N[1];
+	const long int Nz         = sys_vars->N[2];
+	const long int Nz_Fourier = sys_vars->N[2] / 2 + 1;
+	double fftw_norm_fac = 1.0 / pow(Nx * Ny * Nz, 2.0);
+
+	// -----------------------------------
+	// Compute Fourier Space Vorticity
+	// -----------------------------------
+	// Compute w_k from the Fourier space velocity u_k
+	for (int i = 0; i < local_Nx; ++i) {
+		tmp1 = i * Ny;
+		for (int j = 0; j < Ny; ++j) {
+			tmp2 = Nz_Fourier * (tmp1 + j);
+			for (int k = 0; k < Nz_Fourier; ++k) {
+				indx = tmp2 + k;
+
+				// Compute the curl of u_k
+				dw_hat_dt[SYS_DIM * indx + 0] = I * (run_data->k[1][j] * u_hat[SYS_DIM * indx + 2] - run_data->k[2][k] * u_hat[SYS_DIM * indx + 1]);
+				dw_hat_dt[SYS_DIM * indx + 1] = I * (run_data->k[2][k] * u_hat[SYS_DIM * indx + 0] - run_data->k[0][i] * u_hat[SYS_DIM * indx + 2]);
+				dw_hat_dt[SYS_DIM * indx + 2] = I * (run_data->k[0][i] * u_hat[SYS_DIM * indx + 1] - run_data->k[1][j] * u_hat[SYS_DIM * indx + 0]);
+			}
+		}
+	}
+
+	// ----------------------------------
+	// Transform to Real Space
+	// ----------------------------------
+	// Batch transform Fourier velocites to real space
+	fftw_mpi_execute_dft_c2r((sys_vars->fftw_3d_dft_trans_batch_c2r), dw_hat_dt, vort);
+	// Batch transform Fourier vorticity to real space
+	fftw_mpi_execute_dft_c2r((sys_vars->fftw_3d_dft_trans_batch_c2r), u_hat, u);
+
+	// ---------------------------------------------
+	// Perform Cross Product in Real Space
+	// ---------------------------------------------
+	// Compute u x w in real space
+	for (int i = 0; i < local_Nx; ++i) {
+		tmp1 = i * Ny;
+		for (int j = 0; j < Ny; ++j) {
+			tmp2 = (Nz + 2) * (tmp1 + j);
+			for (int k = 0; k < Nz; ++k) {
+				indx = tmp2 + k;
+
+				// Compute the u curl w
+				curl[SYS_DIM * indx + 0] = u[SYS_DIM * indx + 1] * vort[SYS_DIM * indx + 2] - u[SYS_DIM * indx + 2] * vort[SYS_DIM * indx + 1];
+				curl[SYS_DIM * indx + 1] = u[SYS_DIM * indx + 2] * vort[SYS_DIM * indx + 0] - u[SYS_DIM * indx + 0] * vort[SYS_DIM * indx + 2];
+				curl[SYS_DIM * indx + 2] = u[SYS_DIM * indx + 0] * vort[SYS_DIM * indx + 1] - u[SYS_DIM * indx + 1] * vort[SYS_DIM * indx + 0];
+			}			
+		}
+	}
+
+	// ----------------------------------
+	// Transform to Fourier Space
+	// ----------------------------------
+	// Batch transform both fourier vorticity derivatives to real space
+	fftw_mpi_execute_dft_r2c((sys_vars->fftw_3d_dft_trans_batch_r2c), curl, dw_hat_dt);
+	
+	// Normalize the result
+ 	for (int i = 0; i < local_Nx; ++i) {
+ 		tmp1 = i * Ny;
+ 		for (int j = 0; j < Ny; ++j) {
+ 			tmp2 = Nz_Fourier * (tmp1 + j);
+ 			for (int k = 0; k < Nz_Fourier; ++k) {
+ 				indx = tmp2 + k;
+
+ 				dw_hat_dt[SYS_DIM * indx + 0] *= fftw_norm_fac;
+ 				dw_hat_dt[SYS_DIM * indx + 1] *= fftw_norm_fac;
+ 				dw_hat_dt[SYS_DIM * indx + 2] *= fftw_norm_fac;
+ 			}
+ 		}
+ 	}
+ 	// -------------------------------------
+ 	// Apply Dealiasing & Forcing
+ 	// -------------------------------------
+ 	// Apply dealiasing 
+ 	ApplyDealiasing(dw_hat_dt, SYS_DIM, sys_vars->N);
+
+ 	// // Forcing 
+ 	// ApplyForcing(dw_hat_dt, sys_vars->N);
 }
 /**
  * Function to initialize all the integration time variables
@@ -394,16 +605,14 @@ void InitializeSystemMeasurables(RK_data_struct* RK_data) {
 }
 /**
  * Function to compute the initial condition for the integration
- * @param w_hat Fourier space vorticity
+ * @param u_hat Fourier space velocity
  * @param u     Real space velocities in batch layout - both u and v
- * @param u_hat Fourier space velocities in batch layout - both u_hat and v_hat
  * @param N     Array containing the dimensions of the system
  */
-void InitialConditions(fftw_complex* w_hat, double* u, fftw_complex* u_hat, const long int* N) {
+void InitialConditions(fftw_complex* u_hat, double* u, const long int* N) {
 
 	// Initialize variables
 	int tmp1, tmp2, indx;
-	const long int Nx         = N[0];
 	const long int Ny 		  = N[1];
 	const long int Nz 		  = N[2];
 	const long int Nz_Fourier = N[2] / 2 + 1; 
@@ -500,7 +709,6 @@ void ApplyDealiasing(fftw_complex* array, int array_dim, const long int* N) {
 	ptrdiff_t local_Nx        = sys_vars->local_Nx;
 	const long int Nx         = N[0];
 	const long int Ny         = N[1];
-	const long int Nz         = N[2];
 	const long int Nz_Fourier = Ny / 2 + 1;
 	#if defined(__DEALIAS_HOU_LI)
 	double hou_li_filter;
@@ -712,6 +920,21 @@ void AllocateMemory(const long int* NBatch, RK_data_struct* RK_data) {
 		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for Integration Array ["CYAN"%s"RESET"] \n-->> Exiting!!!\n", "RK_tmp");
 		exit(1);
 	}
+	RK_data->curl = (double* )fftw_malloc(sizeof(double) * 2 * sys_vars->alloc_local_batch);
+	if (RK_data->curl == NULL) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for Integration Array ["CYAN"%s"RESET"] \n-->> Exiting!!!\n", "Curl");
+		exit(1);
+	}
+	RK_data->vel = (double* )fftw_malloc(sizeof(double) * 2 * sys_vars->alloc_local_batch);
+	if (RK_data->vel == NULL) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for Integration Array ["CYAN"%s"RESET"] \n-->> Exiting!!!\n", "Vel");
+		exit(1);
+	}
+	RK_data->vort = (double* )fftw_malloc(sizeof(double) * 2 * sys_vars->alloc_local_batch);
+	if (RK_data->vort == NULL) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for Integration Array ["CYAN"%s"RESET"] \n-->> Exiting!!!\n", "Vort");
+		exit(1);
+	}
 
 	// -------------------------------
 	// Initialize All Data 
@@ -738,27 +961,30 @@ void AllocateMemory(const long int* NBatch, RK_data_struct* RK_data) {
 					}
 					run_data->x[2][k] = 0.0;
 				}
-				if (k < Nz_Fourier) {
-					run_data->w_hat[SYS_DIM * indx_f + 0] = 0.0 + 0.0 * I;
-					run_data->w_hat[SYS_DIM * indx_f + 1] = 0.0 + 0.0 * I;
-					run_data->w_hat[SYS_DIM * indx_f + 2] = 0.0 + 0.0 * I;
-					run_data->u_hat[SYS_DIM * indx_f + 0] = 0.0 + 0.0 * I;
-					run_data->u_hat[SYS_DIM * indx_f + 1] = 0.0 + 0.0 * I;
-					run_data->u_hat[SYS_DIM * indx_f + 2] = 0.0 + 0.0 * I;
+				for (int d = 0; d < SYS_DIM; ++d) {
+					if (k < Nz_Fourier) {
+						run_data->w_hat[SYS_DIM * indx_f + d]  = 0.0 + 0.0 * I;
+						run_data->u_hat[SYS_DIM * indx_f + d]  = 0.0 + 0.0 * I;
+						RK_data->RK1[SYS_DIM * indx_f + d]     = 0.0 + 0.0 * I;
+						RK_data->RK2[SYS_DIM * indx_f + d]     = 0.0 + 0.0 * I;
+						RK_data->RK3[SYS_DIM * indx_f + d]     = 0.0 + 0.0 * I;
+						RK_data->RK4[SYS_DIM * indx_f + d]     = 0.0 + 0.0 * I;
+						RK_data->RK_tmp[SYS_DIM * indx_f + d]  = 0.0 + 0.0 * I;
+					}
+					run_data->w[SYS_DIM * indx_r + d]   = 0.0;
+					run_data->u[SYS_DIM * indx_r + d] 	= 0.0;
+					RK_data->vel[SYS_DIM * indx_r + d]  = 0.0;
+					RK_data->vort[SYS_DIM * indx_r + d] = 0.0;
+					RK_data->curl[SYS_DIM * indx_r + d] = 0.0;
 				}
-				run_data->w[SYS_DIM * indx_r + 0] = 0.0;
-				run_data->w[SYS_DIM * indx_r + 1] = 0.0;
-				run_data->w[SYS_DIM * indx_r + 2] = 0.0;
-				run_data->u[SYS_DIM * indx_r + 0] = 0.0;
-				run_data->u[SYS_DIM * indx_r + 1] = 0.0;
-				run_data->u[SYS_DIM * indx_r + 2] = 0.0;
 			}
 		}
 	}
 }
 /**
  * Wrapper function that initializes the FFTW plans using MPI
- * @param N Array containing the dimensions of the system
+ * @param N       Array containing the dimensions of the system
+ * @param NTBatch Array containing the dimensions of the system for the transposed plans
  */
 void InitializeFFTWPlans(const long int* N, const long int* NTBatch) {
 
@@ -861,6 +1087,10 @@ void FreeMemory(RK_data_struct* RK_data) {
 	fftw_free(RK_data->RK2);
 	fftw_free(RK_data->RK3);
 	fftw_free(RK_data->RK4);
+	fftw_free(RK_data->RK_tmp);
+	fftw_free(RK_data->curl);
+	fftw_free(RK_data->vel);
+	fftw_free(RK_data->vort);
 
 	// ------------------------
 	// Destroy FFTW plans 
