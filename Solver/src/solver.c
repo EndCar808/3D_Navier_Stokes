@@ -70,6 +70,16 @@ void SpectralSolve(void) {
 	InitializeFFTWPlans(N, NTBatch);
 
 	// -------------------------------
+	// Initialize the System
+	// -------------------------------
+	// Initialize the collocation points and wavenumber space 
+	InitializeSpaceVariables(run_data->x, run_data->k, N);
+	PrintSpaceVariables(N);
+
+	// Get initial conditions
+	InitialConditions(run_data->w_hat, run_data->u, run_data->u_hat, N);
+
+	// -------------------------------
 	// Integration Variables
 	// -------------------------------
 	// Initialize integration variables
@@ -79,15 +89,24 @@ void SpectralSolve(void) {
 	double T;
 	long int trans_steps;
 
+	// Get timestep and other integration variables
+	// InitializeIntegrationVariables(&t0, &t, &dt, &T, &trans_steps);
+	
 	// -------------------------------
-	// Initialize the System
+	// Create & Open Output File
 	// -------------------------------
-	// Initialize the collocation points and wavenumber space 
-	InitializeSpaceVariables(run_data->x, run_data->k, N);
-	PrintSpaceVariables(N);
+	// Inialize system measurables
+	InitializeSystemMeasurables(RK_data);
+	   
+	// Create and open the output file - also write initial conditions to file
+	CreateOutputFilesWriteICs(N, dt);
 
-	// Get initial conditions
-	InitialConditions(run_data->w_hat, run_data->u, run_data->u_hat, N);
+	// -------------------------------------------------
+	// Print IC to Screen 
+	// -------------------------------------------------
+	// #if defined(__PRINT_SCREEN)
+	// PrintUpdateToTerminal(0, t0, dt, T, 0);
+	// #endif
 
 	//////////////////////////////
 	// Begin Integration
@@ -127,6 +146,251 @@ void SpectralSolve(void) {
 	// Clean Up 
 	// -------------------------------
 	FreeMemory(RK_data);
+}
+/**
+ * Function to initialize all the integration time variables
+ * @param t0           The initial time of the simulation
+ * @param t            The current time of the simulaiton
+ * @param dt           The timestep
+ * @param T            The final time of the simulation
+ * @param trans_steps  The number of iterations to perform before saving to file begins
+ */
+void InitializeIntegrationVariables(double* t0, double* t, double* dt, double* T, long int* trans_steps) {
+	
+	// -------------------------------
+	// Get the Timestep
+	// -------------------------------
+	#if defined(__ADAPTIVE_STEP)
+	GetTimestep(&(sys_vars->dt));
+	#endif
+
+	// -------------------------------
+	// Get Time variables
+	// -------------------------------
+	// Compute integration time variables
+	(*t0) = sys_vars->t0;
+	(*t ) = sys_vars->t0;
+	(*dt) = sys_vars->dt;
+	(*T ) = sys_vars->T;
+	sys_vars->min_dt = 10;
+	sys_vars->max_dt = MIN_STEP_SIZE;
+
+	// -------------------------------
+	// Integration Counters
+	// -------------------------------
+	// Number of time steps and saving steps
+	sys_vars->num_t_steps = ((*T) - (*t0)) / (*dt);
+	#if defined(TRANSIENTS)
+	// Get the transient iterations
+	(* trans_steps)       = (long int)(TRANS_FRAC * sys_vars->num_t_steps);
+	sys_vars->trans_iters = (* trans_steps);
+
+	// Get the number of steps to perform before printing to file -> allowing for a transient fraction of these to be ignored
+	sys_vars->num_print_steps = (sys_vars->num_t_steps >= sys_vars->SAVE_EVERY ) ? (sys_vars->num_t_steps - sys_vars->trans_iters) / sys_vars->SAVE_EVERY : sys_vars->num_t_steps - sys_vars->trans_iters;	 
+	if (!(sys_vars->rank)){
+		printf("Total Iters: %ld\t Saving Iters: %ld\t Transient Steps: %ld\n", sys_vars->num_t_steps, sys_vars->num_print_steps, sys_vars->trans_iters);
+	}
+	#else
+	// Get the transient iterations
+	(* trans_steps)       = 0;
+	sys_vars->trans_iters = (* trans_steps);
+
+	// Get the number of steps to perform before printing to file
+	sys_vars->num_print_steps = (sys_vars->num_t_steps >= sys_vars->SAVE_EVERY ) ? sys_vars->num_t_steps / sys_vars->SAVE_EVERY + 1 : sys_vars->num_t_steps + 1; // plus one to include initial condition
+	if (!(sys_vars->rank)){
+		printf("Total Iters: %ld\t Saving Iters: %ld\n", sys_vars->num_t_steps, sys_vars->num_print_steps);
+	}
+	#endif
+
+	// Variable to control how ofter to print to screen -> set it to half the saving to file steps
+	sys_vars->print_every = (sys_vars->num_t_steps >= 10 ) ? (int)sys_vars->SAVE_EVERY : 1;
+}
+/**
+ * Function to initializes and computes the system measurables and spectra of the initial conditions
+ * @param RK_data The struct containing the Runge-Kutta arrays to compute the nonlinear term for the fluxes
+ */
+void InitializeSystemMeasurables(RK_data_struct* RK_data) {
+
+	// Set the size of the arrays to twice the number of printing steps to account for extra steps due to adaptive stepping
+	#if defined(__ADAPTIVE_STEP)
+	sys_vars->num_print_steps = 2 * sys_vars->num_print_steps;
+	#else
+	sys_vars->num_print_steps = sys_vars->num_print_steps;
+	#endif
+	int print_steps = sys_vars->num_print_steps;
+
+	// Get the size of the spectrum arrays
+	#if defined(__ENST_SPECT) || defined(__ENRG_SPECT) || defined(__ENST_FLUX_SPECT) || defined(__ENRG_FLUX_SPECT)
+	const long int Nx = sys_vars->N[0];
+	const long int Ny = sys_vars->N[1];
+	const long int Nz = sys_vars->N[2];
+
+	sys_vars->n_spect = (int) sqrt(pow((double)Nx / 2.0, 2.0) + pow((double)Ny / 2.0, 2.0) + pow((double)Nz / 2.0, 2.0)) + 1;
+	int n_spect = sys_vars->n_spect;
+	#endif
+		
+	// ------------------------
+	// Allocate Memory
+	// ------------------------
+	#if defined(__SYS_MEASURES)
+	// Total Energy in the system
+	run_data->tot_energy = (double* )fftw_malloc(sizeof(double) * print_steps);
+	if (run_data->tot_energy == NULL) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for the ["CYAN"%s"RESET"]\n-->> Exiting!!!\n", "Total Energy");
+		exit(1);
+	}	
+
+	// Total Enstrophy
+	run_data->tot_enstr = (double* )fftw_malloc(sizeof(double) * print_steps);
+	if (run_data->tot_enstr == NULL) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for the ["CYAN"%s"RESET"]\n-->> Exiting!!!\n", "Total Enstrophy");
+		exit(1);
+	}	
+
+	// Total Palinstrophy
+	run_data->tot_palin = (double* )fftw_malloc(sizeof(double) * print_steps);
+	if (run_data->tot_palin == NULL) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for the ["CYAN"%s"RESET"]\n-->> Exiting!!!\n", "Total Palinstrophy");
+		exit(1);
+	}	
+
+	// Energy Dissipation Rate
+	run_data->enrg_diss = (double* )fftw_malloc(sizeof(double) * print_steps);
+	if (run_data->enrg_diss == NULL) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for the ["CYAN"%s"RESET"]\n-->> Exiting!!!\n", "Energy Dissipation Rate");
+		exit(1);
+	}	
+
+	// Enstrophy Dissipation Rate
+	run_data->enst_diss = (double* )fftw_malloc(sizeof(double) * print_steps);
+	if (run_data->enst_diss == NULL) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for the ["CYAN"%s"RESET"]\n-->> Exiting!!!\n", "Enstrophy Dissipation Rate");
+		exit(1);
+	}	
+	#endif
+	#if defined(__ENST_SPECT )
+	// Enstrophy Spectrum
+	run_data->enst_spect = (double* )fftw_malloc(sizeof(double) * n_spect);
+	if (run_data->enst_spect == NULL) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for the ["CYAN"%s"RESET"]\n-->> Exiting!!!\n", "Enstrophy Spectrum");
+		exit(1);
+	}	
+	#endif
+	#if defined(__ENRG_SPECT )
+	// Energy Spectrum
+	run_data->enrg_spect = (double* )fftw_malloc(sizeof(double) * n_spect);
+	if (run_data->enrg_spect == NULL) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for the ["CYAN"%s"RESET"]\n-->> Exiting!!!\n", "Energy Spectrum");
+		exit(1);
+	}	
+	#endif
+	#if defined(__ENST_FLUX)
+	// Enstrophy flux
+	run_data->enst_flux_sbst = (double* )fftw_malloc(sizeof(double) * print_steps);
+	if (run_data->enst_flux_sbst == NULL) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for the ["CYAN"%s"RESET"]\n-->> Exiting!!!\n", "Enstrophy Flux Subset");
+		exit(1);
+	}	
+
+	// Enstrophy Dissipation Rate
+	run_data->enst_diss_sbst = (double* )fftw_malloc(sizeof(double) * print_steps);
+	if (run_data->enst_diss_sbst == NULL) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for the ["CYAN"%s"RESET"]\n-->> Exiting!!!\n", "Enstrophy Dissipation Rate Subset");
+		exit(1);
+	}	
+	#endif
+	#if defined(__ENRG_FLUX)
+	// Energy Flux
+	run_data->enrg_flux_sbst = (double* )fftw_malloc(sizeof(double) * print_steps);
+	if (run_data->enrg_flux_sbst == NULL) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for the ["CYAN"%s"RESET"]\n-->> Exiting!!!\n", "Energy Flux Subset");
+		exit(1);
+	}	
+
+	// Energy Dissipation Rate
+	run_data->enrg_diss_sbst = (double* )fftw_malloc(sizeof(double) * print_steps);
+	if (run_data->enrg_diss_sbst == NULL) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for the ["CYAN"%s"RESET"]\n-->> Exiting!!!\n", "Energy Dissipation Rate Subset");
+		exit(1);
+	}
+	#endif
+	// Time
+	#if defined(__TIME)
+	if (!(sys_vars->rank)){
+		run_data->time = (double* )fftw_malloc(sizeof(double) * print_steps);
+		if (run_data->time == NULL) {
+			fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for the ["CYAN"%s"RESET"]\n-->> Exiting!!!\n", "Time");
+			exit(1);
+		}	
+	}
+	#endif
+	#if defined(__ENST_FLUX_SPECT )
+	// Enstrophy Spectrum
+	run_data->enst_flux_spect = (double* )fftw_malloc(sizeof(double) * n_spect);
+	if (run_data->enst_flux_spect == NULL) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for the ["CYAN"%s"RESET"]\n-->> Exiting!!!\n", "Enstrophy Flux Spectrum");
+		exit(1);
+	}	
+	#endif
+	#if defined(__ENRG_FLUX_SPECT )
+	// Energy Spectrum
+	run_data->enrg_flux_spect = (double* )fftw_malloc(sizeof(double) * n_spect);
+	if (run_data->enrg_flux_spect == NULL) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for the ["CYAN"%s"RESET"]\n-->> Exiting!!!\n", "Energy Flux Spectrum");
+		exit(1);
+	}	
+	#endif
+
+	// // ----------------------------
+	// // Get Measurables of the ICs
+	// // ----------------------------
+	// #if defined(__SYS_MEASURES)
+	// // Total Energy
+	// run_data->tot_energy[0] = TotalEnergy();
+
+	// // Total Enstrophy
+	// run_data->tot_enstr[0] = TotalEnstrophy();
+
+	// // Total Palinstrophy
+	// run_data->tot_palin[0] = TotalPalinstrophy();
+
+	// // Energy dissipation rate
+	// run_data->enrg_diss[0] = EnergyDissipationRate();
+
+	// // Enstrophy dissipation rate
+	// run_data->enst_diss[0] = EnstrophyDissipationRate();
+	// #endif
+	// #if defined(__ENST_FLUX)
+	// // Enstrophy Flux and dissipation from/to Subset of modes
+	// EnstrophyFlux(&(run_data->enst_flux_sbst[0]), &(run_data->enst_diss_sbst[0]), RK_data);
+	// #endif
+	// #if defined(__ENRG_FLUX)
+	// // Energy Flux and dissipation from/to a subset of modes
+	// EnergyFlux(&(run_data->enrg_flux_sbst[0]), &(run_data->enrg_diss_sbst[0]), RK_data);
+	// #endif
+	// // Time
+	// #if defined(__TIME)
+	// if (!(sys_vars->rank)) {
+	// 	run_data->time[0] = sys_vars->t0;
+	// }
+	// #endif
+
+	// // ----------------------------
+	// // Get Spectra of the ICs
+	// // ----------------------------
+	// // Call spectra functions
+	// #if defined(__ENST_SPECT)
+	// EnstrophySpectrum();
+	// #endif
+	// #if defined(__ENRG_SPECT)
+	// EnergySpectrum();
+	// #endif
+	// #if defined(__ENRG_FLUX_SPECT)
+	// EnergyFluxSpectrum(RK_data);
+	// #endif
+	// #if defined(__ENST_FLUX_SPECT)
+	// EnstrophyFluxSpectrum(RK_data);
+	// #endif
 }
 /**
  * Function to compute the initial condition for the integration
@@ -173,25 +437,7 @@ void InitialConditions(fftw_complex* w_hat, double* u, fftw_complex* u_hat, cons
 
     	// Transform velocities to Fourier space & dealias
     	fftw_mpi_execute_dft_r2c(sys_vars->fftw_3d_dft_batch_r2c, u, u_hat);
-    	// ApplyDealiasing(u_hat, 2, N);
-
-    	// -------------------------------------------------
-    	// Taylor Green Initial Condition - Fourier Space
-    	// -------------------------------------------------
-    	for (int i = 0; i < local_Nx; ++i) {	
-    		tmp1 = i * Ny;
-    		for (int j = 0; j < Ny; ++j) {
-    			tmp2 = Nz_Fourier * (tmp1 + j);
-    			for (int k = 0; k < Nz_Fourier; ++k) {
-    				indx = tmp2 + k;
-
-	    			// Fill the Fourier space vorticity
-	    			w_hat[SYS_DIM * indx + 0] = I * (run_data->k[1][j] * u_hat[SYS_DIM * indx + 2] - run_data->k[2][k] * u_hat[SYS_DIM * indx + 1]);
-	    			w_hat[SYS_DIM * indx + 1] = I * (run_data->k[2][k] * u_hat[SYS_DIM * indx + 0] - run_data->k[0][i] * u_hat[SYS_DIM * indx + 2]);
-	    			w_hat[SYS_DIM * indx + 2] = I * (run_data->k[0][i] * u_hat[SYS_DIM * indx + 1] - run_data->k[1][j] * u_hat[SYS_DIM * indx + 0]);
-    			}    			
-    		}
-    	}
+    	ApplyDealiasing(u_hat, SYS_DIM, N);
     }
     else if(!(strcmp(sys_vars->u0, "TESTING"))) {
     	// ------------------------------------------------
@@ -211,9 +457,9 @@ void InitialConditions(fftw_complex* w_hat, double* u, fftw_complex* u_hat, cons
 					indx = tmp2 + k;
 
 					// Fill vorticity
-					w_hat[SYS_DIM * indx + 0] = ((double)rand() / (double) RAND_MAX) * cexp(((double)rand() / (double) RAND_MAX) * 2.0 * M_PI * I);
-					w_hat[SYS_DIM * indx + 1] = ((double)rand() / (double) RAND_MAX) * cexp(((double)rand() / (double) RAND_MAX) * 2.0 * M_PI * I);
-					w_hat[SYS_DIM * indx + 2] = ((double)rand() / (double) RAND_MAX) * cexp(((double)rand() / (double) RAND_MAX) * 2.0 * M_PI * I);
+					u_hat[SYS_DIM * indx + 0] = ((double)rand() / (double) RAND_MAX) * cexp(((double)rand() / (double) RAND_MAX) * 2.0 * M_PI * I);
+					u_hat[SYS_DIM * indx + 1] = ((double)rand() / (double) RAND_MAX) * cexp(((double)rand() / (double) RAND_MAX) * 2.0 * M_PI * I);
+					u_hat[SYS_DIM * indx + 2] = ((double)rand() / (double) RAND_MAX) * cexp(((double)rand() / (double) RAND_MAX) * 2.0 * M_PI * I);
 				}
 			}
 		}		
@@ -241,6 +487,61 @@ void InitialConditions(fftw_complex* w_hat, double* u, fftw_complex* u_hat, cons
    	// }
    	// #endif
 }
+/**
+ * Function to apply the selected dealiasing filter to the input array. Can be Fourier vorticity or velocity
+ * @param array    	The array containing the Fourier modes to dealiased
+ * @param array_dim The extra array dimension -> will be 1 for scalar or 2 for vector
+ * @param N        	Array containing the dimensions of the system
+ */
+void ApplyDealiasing(fftw_complex* array, int array_dim, const long int* N) {
+
+	// Initialize variables
+	int tmp1, tmp2, indx;
+	ptrdiff_t local_Nx        = sys_vars->local_Nx;
+	const long int Nx         = N[0];
+	const long int Ny         = N[1];
+	const long int Nz         = N[2];
+	const long int Nz_Fourier = Ny / 2 + 1;
+	#if defined(__DEALIAS_HOU_LI)
+	double hou_li_filter;
+	#endif
+
+	// --------------------------------------------
+	// Apply Appropriate Filter 
+	// --------------------------------------------
+	for (int i = 0; i < local_Nx; ++i) {
+		tmp1 = i * Ny;
+		for (int j = 0; j < Ny; ++j) {
+			tmp2 = Nz_Fourier * (tmp1 + j);
+			for (int k = 0; k < Nz_Fourier; ++k) {
+				indx = (tmp2 + k);
+
+				#if defined(__DEALIAS_23)
+				if (sqrt((double) run_data->k[0][i] * run_data->k[0][i] + run_data->k[1][j] * run_data->k[1][j] + run_data->k[2][k] * run_data->k[2][k]) > Nx / 3) {
+					for (int l = 0; l < array_dim; ++l) {
+						// Set dealised modes to 0
+						array[array_dim * indx + l] = 0.0 + 0.0 * I;	
+					}
+				}
+				else {
+					for (int l = 0; l < array_dim; ++l) {
+						// Apply DFT normaliztin to undealiased modes
+						array[array_dim * indx + l] = array[indx + l];	
+					}				
+				}
+				#elif __DEALIAS_HOU_LI
+				// Compute Hou-Li filter
+				hou_li_filter = exp(-36.0 * pow((sqrt(pow(run_data->k[0][i] / (Nx / 2), 2.0) + pow(run_data->k[1][j] / (Ny / 2), 2.0) + pow(run_data->k[2][k] / (Nz / 2), 2.0))), 36.0));
+
+				for (int l = 0; l < array_dim; ++l) {
+					// Apply filter and DFT normaliztion
+					array[array_dim * indx + l] *= hou_li_filter;
+				}
+				#endif
+			}
+		}
+	}
+}	
 /**
  * Function to initialize the Real space collocation points arrays and Fourier wavenumber arrays
  * 
@@ -519,6 +820,41 @@ void FreeMemory(RK_data_struct* RK_data) {
 	fftw_free(run_data->u_hat);
 	fftw_free(run_data->w);
 	fftw_free(run_data->w_hat);
+	#if defined(__SYS_MEASURES)
+	fftw_free(run_data->tot_energy);
+	fftw_free(run_data->tot_enstr);
+	fftw_free(run_data->tot_palin);
+	fftw_free(run_data->enrg_diss);
+	fftw_free(run_data->enst_diss);
+	#endif
+	#if defined(__ENST_FLUX)
+	fftw_free(run_data->enst_flux_sbst);
+	fftw_free(run_data->enst_diss_sbst);
+	#endif
+	#if defined(__ENRG_FLUX)
+	fftw_free(run_data->enrg_flux_sbst);
+	fftw_free(run_data->enrg_diss_sbst);
+	#endif
+	#if defined(__ENRG_SPECT)
+	fftw_free(run_data->enrg_spect);
+	#endif
+	#if defined(__ENRG_FLUX_SPECT)
+	fftw_free(run_data->enrg_flux_spect);
+	#endif
+	#if defined(__ENST_SPECT)
+	fftw_free(run_data->enst_spect);
+	#endif
+	#if defined(__ENST_FLUX_SPECT)
+	fftw_free(run_data->enst_flux_spect);
+	#endif
+	#if defined(TESTING)
+	fftw_free(run_data->tg_soln);
+	#endif
+	#if defined(__TIME)
+	if (!(sys_vars->rank)){
+		fftw_free(run_data->time);
+	}
+	#endif
 
 	// Free integration arrays
 	fftw_free(RK_data->RK1);

@@ -159,14 +159,9 @@ int GetCMLArgs(int argc, char** argv) {
                 break;
             case 'i':
                 // Read in the initial conditions
-                if (!(strcmp(optarg,"TG_VEL"))) {
+                if (!(strcmp(optarg,"TAYLOR_GREEN"))) {
                     // The Taylor Green vortex - starting with the velocity
-                    strncpy(sys_vars->u0, "TG_VEL", 64);
-                    break;
-                }
-                else if (!(strcmp(optarg,"TG_VORT"))) {
-                    // The Taylor Green vortex - starting with the vorticity
-                    strncpy(sys_vars->u0, "TG_VORT", 64);
+                    strncpy(sys_vars->u0, "TAYLOR_GREEN", 64);
                     break;
                 }
                 else if (!(strcmp(optarg,"TESTING"))) {
@@ -242,7 +237,6 @@ void PrintSpaceVariables(const long int* N) {
 
     // Initialize variables
     const long int Nx         = N[0];
-    const long int Ny         = N[1];
     const long int Nz_Fourier = N[2] / 2 + 1; 
 
     // Allocate global array memory
