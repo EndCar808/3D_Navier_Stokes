@@ -433,12 +433,13 @@ void GetOutputDirPath(void) {
 void WriteDataToFile(double t, double dt, long int iters) {
 
 	// Initialize Variables
-	int tmp;
+	int tmp1, tmp2;
 	int indx;
 	char group_name[128];
 	const long int Nx 		  = sys_vars->N[0];
 	const long int Ny 		  = sys_vars->N[1];
-	const long int Ny_Fourier = sys_vars->N[1] / 2 + 1;
+	const long int Nz 		  = sys_vars->N[2];
+	const long int Nz_Fourier = sys_vars->N[2] / 2 + 1;
 	herr_t status;
 	hid_t main_group_id;
 	#if defined(__ENST_SPECT) || defined(__ENRG_SPECT) || defined(__ENST_FLUX_SPECT) || defined(__ENRG_FLUX_SPECT)
@@ -449,12 +450,14 @@ void WriteDataToFile(double t, double dt, long int iters) {
 	hsize_t dset_dims2D[d_set_rank2D];        // array to hold dims of the dataset to be created
 	hsize_t slab_dims2D[d_set_rank2D];	      // Array to hold the dimensions of the hyperslab
 	hsize_t mem_space_dims2D[d_set_rank2D];   // Array to hold the dimensions of the memoray space - for real data this will be different to slab_dims due to 0 padding
-	#if defined(__MODES) || defined(__REALSPACE)
 	static const int d_set_rank3D = 3;
 	hsize_t dset_dims3D[d_set_rank3D];        // array to hold dims of the dataset to be created
 	hsize_t slab_dims3D[d_set_rank3D];	      // Array to hold the dimensions of the hyperslab
 	hsize_t mem_space_dims3D[d_set_rank3D];   // Array to hold the dimensions of the memoray space - for real data this will be different to slab_dims due to 0 padding
-	#endif
+	static const int d_set_rank4D = 4;
+	hsize_t dset_dims4D[d_set_rank4D];        // array to hold dims of the dataset to be created
+	hsize_t slab_dims4D[d_set_rank4D];	      // Array to hold the dimensions of the hyperslab
+	hsize_t mem_space_dims4D[d_set_rank4D];   // Array to hold the dimensions of the memoray space - for real data this will be different to slab_dims due to 0 padding
 
 	// --------------------------------------
 	// Check if files exist and Open/Create
@@ -501,6 +504,139 @@ void WriteDataToFile(double t, double dt, long int iters) {
 		}
 	}
 	#endif
+
+
+	// -------------------------------
+	// Create Group 
+	// -------------------------------
+	// Initialize Group Name
+	sprintf(group_name, "/Iter_%05d", (int)iters);
+	
+	// Create group for the current iteration data
+	main_group_id = CreateGroup(file_info->output_file_handle, file_info->output_file_name, group_name, t, dt, iters);
+	#if defined(__ENST_SPECT) || defined(__ENRG_SPECT) || defined(__ENST_FLUX_SPECT) || defined(__ENRG_FLUX_SPECT)
+	if (!sys_vars->rank) {
+		spectra_group_id = CreateGroup(file_info->spectra_file_handle, file_info->spectra_file_name, group_name, t, dt, iters);
+	}
+	#endif
+
+	// -------------------------------
+	// Write Datasets to File
+	// -------------------------------
+	///------------------------------- Real Space Vorticity
+	#if defined(__VORT_REAL)
+	// Transform vorticity back to real space and normalize
+	fftw_mpi_execute_dft_c2r(sys_vars->fftw_3d_dft_batch_c2r, run_data->w_hat, run_data->w);
+	for (int i = 0; i < sys_vars->local_Nx; ++i) {
+		tmp1 = i * Ny;
+		for (int j = 0; j < Ny; ++j) {
+			tmp2 = (Nz + 2) * (tmp1 + j);
+			for (int k = 0; k < Nz; ++k) {
+				indx = tmp2 + k;
+
+				// Normalize
+				run_data->w[SYS_DIM * indx + 0] *= 1.0 / (double) (Nx * Ny * Nz);
+				run_data->w[SYS_DIM * indx + 1] *= 1.0 / (double) (Nx * Ny * Nz);
+				run_data->w[SYS_DIM * indx + 2] *= 1.0 / (double) (Nx * Ny * Nz);
+			}			
+		}
+	}
+
+	// Specify dataset dimensions
+	dset_dims4D[0] 	  = Nx;
+	dset_dims4D[1] 	  = Ny;
+	dset_dims4D[2] 	  = Nz;
+	dset_dims4D[3] 	  = SYS_DIM;
+	slab_dims4D[0]      = sys_vars->local_Nx;
+	slab_dims4D[1]      = Ny;
+	slab_dims4D[2]      = Nz;
+	slab_dims4D[3]      = SYS_DIM;
+	mem_space_dims4D[0] = sys_vars->local_Nx;
+	mem_space_dims4D[1] = Ny;
+	mem_space_dims4D[2] = Nz + 2;
+	mem_space_dims4D[3] = SYS_DIM;
+
+	// Write the real space vorticity
+	WriteGroupDataReal(t, (int)iters, main_group_id, "w", H5T_NATIVE_DOUBLE, d_set_rank4D, dset_dims4D, slab_dims4D, mem_space_dims4D, sys_vars->local_Nx_start, run_data->w);
+	#endif
+
+	///---------------------------- Write Fourier Space Vorticity
+	#if defined(__VORT_FOUR)
+	// Create dimension arrays
+	dset_dims4D[0] 	  = Nx;
+	dset_dims4D[1] 	  = Ny;
+	dset_dims4D[2] 	  = Nz_Fourier;
+	dset_dims4D[3] 	  = SYS_DIM;
+	slab_dims4D[0]      = sys_vars->local_Nx;
+	slab_dims4D[1]      = Ny;
+	slab_dims4D[2]      = Nz_Fourier;
+	slab_dims4D[3]      = SYS_DIM;
+	mem_space_dims4D[0] = sys_vars->local_Nx;
+	mem_space_dims4D[1] = Ny;
+	mem_space_dims4D[2] = Nz_Fourier;
+	mem_space_dims4D[3] = SYS_DIM;
+
+	// Write the real space vorticity
+	WriteGroupDataFourier(t, (int)iters, main_group_id, "w_hat", file_info->COMPLEX_DTYPE, d_set_rank4D, dset_dims4D, slab_dims4D, mem_space_dims4D, sys_vars->local_Nx_start, run_data->w_hat);
+	#endif
+
+	///-------------------------- Write the Fourier Space velocity 
+	#if defined(__MODES)
+	// Create dimension arrays
+	dset_dims4D[0] 	    = Nx;
+	dset_dims4D[1] 	    = Ny;
+	dset_dims4D[2] 	    = Nz_Fourier;
+	dset_dims4D[3]      = SYS_DIM;
+	slab_dims4D[0] 	    = sys_vars->local_Nx;
+	slab_dims4D[1] 	    = Ny;
+	slab_dims4D[2] 	    = Nz_Fourier;
+	slab_dims4D[3]      = SYS_DIM;
+	mem_space_dims4D[0] = sys_vars->local_Nx;
+	mem_space_dims4D[1] = Ny;
+	mem_space_dims4D[2] = Nz_Fourier;
+	mem_space_dims4D[3] = SYS_DIM;
+
+	// Write the real space vorticity
+	WriteGroupDataFourier(t, (int)iters, main_group_id, "u_hat", file_info->COMPLEX_DTYPE, d_set_rank4D, dset_dims4D, slab_dims4D, mem_space_dims4D, sys_vars->local_Nx_start, run_data->u_hat);
+	#endif
+
+	///-------------------------- Write the Real Space velocity 
+	#if defined(__REALSPACE)
+	// Transform velocities back to real space and normalize
+	fftw_mpi_execute_dft_c2r(sys_vars->fftw_3d_dft_batch_c2r, run_data->u_hat, run_data->u);
+	for (int i = 0; i < sys_vars->local_Nx; ++i) {
+		tmp1 = i * Ny;
+		for (int j = 0; j < Ny; ++j) {
+			tmp2 = (Nz + 2) * (tmp1 + j);
+			for (int k = 0; k < Nz; ++k) {
+				indx = tmp2 + k;
+
+				// Normalize
+				run_data->u[SYS_DIM * indx + 0] *= 1.0 / (double) (Nx * Ny * Nz);
+				run_data->u[SYS_DIM * indx + 1] *= 1.0 / (double) (Nx * Ny * Nz);
+				run_data->u[SYS_DIM * indx + 2] *= 1.0 / (double) (Nx * Ny * Nz);
+			}
+		}
+	}
+
+	// Specify dataset dimensions
+	dset_dims4D[0] 	  = Nx;
+	dset_dims4D[1] 	  = Ny;
+	dset_dims4D[2] 	  = Nz;
+	dset_dims4D[3] 	  = SYS_DIM;
+	slab_dims4D[0]      = sys_vars->local_Nx;
+	slab_dims4D[1]      = Ny;
+	slab_dims4D[2]      = Nz;
+	slab_dims4D[3]      = SYS_DIM;
+	mem_space_dims4D[0] = sys_vars->local_Nx;
+	mem_space_dims4D[1] = Ny;
+	mem_space_dims4D[2] = Nz + 2;
+	mem_space_dims4D[3] = SYS_DIM;
+
+	// Write the real space vorticity
+	WriteGroupDataReal(t, (int)iters, main_group_id, "u", H5T_NATIVE_DOUBLE, d_set_rank4D, dset_dims4D, slab_dims4D, mem_space_dims4D, sys_vars->local_Nx_start, run_data->u);
+	#endif
+
 
 
 	// -------------------------------

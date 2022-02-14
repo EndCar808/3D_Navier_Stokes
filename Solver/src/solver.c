@@ -63,7 +63,7 @@ void SpectralSolve(void) {
 	// Allocate memory
 	// -------------------------------
 	AllocateMemory(NBatch, RK_data);
-	
+
 	// -------------------------------
 	// FFTW Plans Setup
 	// -------------------------------
@@ -122,7 +122,7 @@ void SpectralSolve(void) {
 	#else
 	long int save_data_indx = 1;
 	#endif
-	while(t <= dt) {
+	while(t <= T) {
 
 		// -------------------------------	
 		// Perform Integration Step
@@ -156,20 +156,20 @@ void SpectralSolve(void) {
 		// -------------------------------
 		// Write To File
 		// -------------------------------
-		// if ((iters > trans_steps) && (iters % sys_vars->SAVE_EVERY == 0)) {
-		// 	#if defined(TESTING)
-		// 	TaylorGreenSoln(t, N);
-		// 	#endif
+		if ((iters > trans_steps) && (iters % sys_vars->SAVE_EVERY == 0)) {
+			// #if defined(TESTING)
+			// TaylorGreenSoln(t, N);
+			// #endif
 
-		// 	// // Record System Measurables
-		// 	// RecordSystemMeasures(t, save_data_indx, RK_data);
+			// // Record System Measurables
+			// RecordSystemMeasures(t, save_data_indx, RK_data);
 
-		// 	// Write the appropriate datasets to file
-		// 	WriteDataToFile(t, dt, save_data_indx);
+			// Write the appropriate datasets to file
+			WriteDataToFile(t, dt, save_data_indx);
 			
-		// 	// Update saving data index
-		// 	save_data_indx++;
-		// }
+			// Update saving data index
+			save_data_indx++;
+		}
 
 		// -------------------------------
 		// Print Update To Screen
@@ -182,7 +182,7 @@ void SpectralSolve(void) {
 		#endif
 		if (iters % sys_vars->SAVE_EVERY == 0) {
 			// PrintUpdateToTerminal(iters, t, dt, T, save_data_indx - 1);
-			if (!sys_vars->rank) printf("Iter: %ld\t t: %lf\n", iters, t);
+			if (!sys_vars->rank) printf("Iter: %ld\t dt: %1.16lf\tt: %lf\n", iters, dt, t);
 		}
 		#endif
 		// -------------------------------
