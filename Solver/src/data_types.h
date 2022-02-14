@@ -221,7 +221,7 @@ typedef struct RK_data_struct {
 	fftw_complex* RK6;		  // Array to hold the result of the sixth stage of RK5 scheme
 	fftw_complex* RK7; 		  // Array to hold the result of the seventh stage of the Dormand Prince Scheme
 	fftw_complex* RK_tmp;	  // Array to hold the tempory updates to w_hat - input to RHS function
-	fftw_complex* w_hat_last; // Array to hold the values of the Fourier space vorticity from the previous iteration - used in the stepsize control in DP scheme
+	fftw_complex* u_hat_last; // Array to hold the values of the Fourier space velocity from the previous iteration - used in the stepsize control in DP scheme
 	double* vel;		  	  // Batch array the velocities in the nonlinear term function
 	double* vort;		  	  // Batch array to hold vorticity in the Nonlinear term function
 	double* curl;		  	  // Batch array to hold curl of the velocity and vorticity

@@ -126,12 +126,12 @@ void SpectralSolve(void) {
 		#if defined(__RK4)
 		RK4Step(dt, N, sys_vars->local_Nx, RK_data);
 		#elif defined(__RK5)
-		RK5DPStep(dt, N, sys_vars->local_Nx, RK_data);
+		RK5DPStep(dt, N, iters, sys_vars->local_Nx, RK_data);
 		#elif defined(__DPRK5)
 		int tries = 0;
 		while (tries < DP_MAX_TRY) {
 			// Try a Dormand Prince step and compute the local error
-			RK5DPStep(dt, N, sys_vars->local_Nx, RK_data);
+			RK5DPStep(dt, N, iters, sys_vars->local_Nx, RK_data);
 
 			// Compute the new timestep
 			dt_new = dt * DPMin(DP_DELTA_MAX, DPMax(DP_DELTA_MIN, DP_DELTA * pow(1.0 / RK_data->DP_errr, 0.2)))
@@ -270,7 +270,7 @@ void RK5DPStep(const double dt, const long int* N, const int iters, const ptrdif
 			for (int k = 0; k < Nz_Fourier; ++k) {
 				indx = tmp2 + k;
 
-				// Update temporary input for nonlinear term
+				// Update temporary input for nonlinear termiters, 
 				RK_data->RK_tmp[SYS_DIM * indx + 0] = run_data->u_hat[SYS_DIM * indx + 0] + dt * RK5_A41 * RK_data->RK1[SYS_DIM * indx + 0] + dt * RK5_A42 * RK_data->RK2[SYS_DIM * indx + 0] + dt * RK5_A43 * RK_data->RK3[SYS_DIM * indx + 0];
 				RK_data->RK_tmp[SYS_DIM * indx + 1] = run_data->u_hat[SYS_DIM * indx + 1] + dt * RK5_A41 * RK_data->RK1[SYS_DIM * indx + 1] + dt * RK5_A42 * RK_data->RK2[SYS_DIM * indx + 1] + dt * RK5_A43 * RK_data->RK3[SYS_DIM * indx + 1];
 				RK_data->RK_tmp[SYS_DIM * indx + 2] = run_data->u_hat[SYS_DIM * indx + 2] + dt * RK5_A41 * RK_data->RK1[SYS_DIM * indx + 2] + dt * RK5_A42 * RK_data->RK2[SYS_DIM * indx + 2] + dt * RK5_A43 * RK_data->RK3[SYS_DIM * indx + 2];
@@ -1359,11 +1359,11 @@ void AllocateMemory(const long int* NBatch, RK_data_struct* RK_data) {
 						RK_data->RK4[SYS_DIM * indx_f + d]    = 0.0 + 0.0 * I;
 						RK_data->RK_tmp[SYS_DIM * indx_f + d] = 0.0 + 0.0 * I;
 						#if defined(__RK5) || defined(__DPRK5)
-						RK_data->RK_5[SYS_DIM * indx_f + d] = 0.0 + 0.0 * I;
-						RK_data->RK_6[SYS_DIM * indx_f + d] = 0.0 + 0.0 * I;						
+						RK_data->RK5[SYS_DIM * indx_f + d] = 0.0 + 0.0 * I;
+						RK_data->RK6[SYS_DIM * indx_f + d] = 0.0 + 0.0 * I;						
 						#endif
 						#if defined(__DPRK5)
-						RK_data->RK_7[SYS_DIM * indx_f + d] 	  = 0.0 + 0.0 * I;
+						RK_data->RK7[SYS_DIM * indx_f + d] 	  	  = 0.0 + 0.0 * I;
 						RK_data->u_hat_last[SYS_DIM * indx_f + d] = 0.0 + 0.0 * I;						
 						#endif
 					}
@@ -1488,11 +1488,11 @@ void FreeMemory(RK_data_struct* RK_data) {
 	fftw_free(RK_data->vel);
 	fftw_free(RK_data->vort);
 	#if defined(__RK5) || defined(__DPRK5)
-	fftw_free(RK_data->RK_5);
-	fftw_free(RK_data->RK_6);						
+	fftw_free(RK_data->RK5);
+	fftw_free(RK_data->RK6);						
 	#endif
 	#if defined(__DPRK5)
-	fftw_free(RK_data->RK_7);
+	fftw_free(RK_data->RK7);
 	fftw_free(RK_data->u_hat_last);						
 	#endif
 
