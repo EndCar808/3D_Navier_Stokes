@@ -242,6 +242,28 @@ void CreateOutputFilesWriteICs(const long int* N, double dt) {
 	// Write the real space vorticity
 	WriteGroupDataReal(0.0, 0, main_group_id, "u", H5T_NATIVE_DOUBLE, d_set_rank4D, dset_dims4D, slab_dims4D, mem_space_dims4D, sys_vars->local_Nx_start, run_data->u);
 	#endif
+
+	///----------------------- Taylor Green Solution
+	#if defined(TESTING)
+	if (!(strcmp(sys_vars->u0, "TAYLOR_GREEN"))) {
+		// Specify dataset dimensions
+		dset_dims4D[0] 	  = Nx;
+		dset_dims4D[1] 	  = Ny;
+		dset_dims4D[2] 	  = Nz;
+		dset_dims4D[3] 	  = SYS_DIM;
+		slab_dims4D[0]      = sys_vars->local_Nx;
+		slab_dims4D[1]      = Ny;
+		slab_dims4D[2]      = Nz;
+		slab_dims4D[3]      = SYS_DIM;
+		mem_space_dims4D[0] = sys_vars->local_Nx;
+		mem_space_dims4D[1] = Ny;
+		mem_space_dims4D[2] = Nz + 2;
+		mem_space_dims4D[3] = SYS_DIM;
+
+		// Write the real space Taylor Green Solution
+		WriteGroupDataReal(0.0, 0, main_group_id, "TGSoln", H5T_NATIVE_DOUBLE, d_set_rank4D, dset_dims4D, slab_dims4D, mem_space_dims4D, sys_vars->local_Nx_start, run_data->tg_soln);	
+	}
+	#endif
 	#endif
 
 	// ------------------------------------
@@ -638,6 +660,29 @@ void WriteDataToFile(double t, double dt, long int iters) {
 	#endif
 
 
+	///----------------------- Taylor Green Solution
+	#if defined(TESTING)
+	if (!(strcmp(sys_vars->u0, "TAYLOR_GREEN"))) {
+		// Specify dataset dimensions
+		dset_dims4D[0] 	  = Nx;
+		dset_dims4D[1] 	  = Ny;
+		dset_dims4D[2] 	  = Nz;
+		dset_dims4D[3] 	  = SYS_DIM;
+		slab_dims4D[0]      = sys_vars->local_Nx;
+		slab_dims4D[1]      = Ny;
+		slab_dims4D[2]      = Nz;
+		slab_dims4D[3]      = SYS_DIM;
+		mem_space_dims4D[0] = sys_vars->local_Nx;
+		mem_space_dims4D[1] = Ny;
+		mem_space_dims4D[2] = Nz + 2;
+		mem_space_dims4D[3] = SYS_DIM;
+
+		// Write the real space Taylor Green Solution
+		WriteGroupDataReal(t, (int)iters, main_group_id, "TGSoln", H5T_NATIVE_DOUBLE, d_set_rank4D, dset_dims4D, slab_dims4D, mem_space_dims4D, sys_vars->local_Nx_start, run_data->tg_soln);	
+	}
+	#endif
+
+
 
 	// -------------------------------
 	// Close identifiers and File
@@ -854,6 +899,218 @@ void WriteGroupDataReal(double t, int iters, hid_t group_id, char* dset_name, hi
 	H5Dclose(file_space);
 	H5Sclose(dset_space);
 	H5Sclose(mem_space);
+}
+/**
+ * Wrapper function that writes all the non-slabbed/chunk datasets to file after integeration has finished - to do so the file must be reponed 
+ * with the right read/write permissions and normal I/0 access properties -> otherwise writing to file in a non MPI way would not work
+ * @param N 			 Array containing the dimensions of the system
+ * @param iters 	     The number of iterations performed by the simulation 
+ * @param save_data_indx The number of saving steps performed by the simulation
+ */
+void FinalWriteAndCloseOutputFile(const long int* N, int iters, int save_data_indx) {
+
+	// Initialize Variables
+	const long int Nx 		  = N[0];
+	const long int Ny 		  = N[1];
+	const long int Nz 		  = N[2];
+	const long int Nz_Fourier = Nz / 2 + 1;
+	herr_t status;
+	static const hsize_t D1 = 1;
+	hsize_t dims1D[D1];
+
+	// Record total iterations
+	sys_vars->tot_iters      = (long int)iters - 1;
+	sys_vars->tot_save_steps = (long int)save_data_indx - 1;
+
+	////////////////////////////////
+	/// Repon and Write Datasets
+	////////////////////////////////
+	// Repon Output file with read/write permissions
+	if (!(sys_vars->rank)) {
+		file_info->output_file_handle = H5Fopen(file_info->output_file_name, H5F_ACC_RDWR , H5P_DEFAULT);
+		if (file_info->output_file_handle < 0) {
+			fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to reopen output file for writing non chunked/slabbed datasets! \n-->>Exiting....\n");
+			exit(1);
+		}
+	}
+
+	// -------------------------------
+	// Write Wavenumbers
+	// -------------------------------
+	#if defined(__WAVELIST)
+	// Allocate array to gather the wavenumbers from each of the local arrays - in the x direction
+	int* k0 = (int* )fftw_malloc(sizeof(int) * Nx);
+	MPI_Gather(run_data->k[0], sys_vars->local_Nx, MPI_INT, k0, sys_vars->local_Nx, MPI_INT, 0, MPI_COMM_WORLD); 
+
+	// Write to file
+	if (!(sys_vars->rank)) {
+		dims1D[0] = Nx;
+		if ( (H5LTmake_dataset(file_info->output_file_handle, "kx", D1, dims1D, H5T_NATIVE_INT, k0)) < 0) {
+			printf("\n["MAGENTA"WARNING"RESET"] --- Failed to make dataset ["CYAN"%s"RESET"]\n", "kx");
+		}
+		dims1D[0] = Ny;
+		if ( (H5LTmake_dataset(file_info->output_file_handle, "ky", D1, dims1D, H5T_NATIVE_INT, run_data->k[1])) < 0) {
+			printf("\n["MAGENTA"WARNING"RESET"] --- Failed to make dataset ["CYAN"%s"RESET"]\n", "ky");
+		}
+		dims1D[0] = Nz_Fourier;
+		if ( (H5LTmake_dataset(file_info->output_file_handle, "kz", D1, dims1D, H5T_NATIVE_INT, run_data->k[2])) < 0) {
+			printf("\n["MAGENTA"WARNING"RESET"] --- Failed to make dataset ["CYAN"%s"RESET"]\n", "kz");
+		}
+	}
+	fftw_free(k0);
+	#endif
+
+	// -------------------------------
+	// Write Collocation Points
+	// -------------------------------
+	#if defined(__COLLOC_PTS)
+	// Allocate array to gather the collocation points from each of the local arrays
+	double* x0 = (double* )fftw_malloc(sizeof(double) * Nx);
+	MPI_Gather(run_data->x[0], sys_vars->local_Nx, MPI_DOUBLE, x0, sys_vars->local_Nx, MPI_DOUBLE, 0, MPI_COMM_WORLD); 
+
+	// Write to file
+	if (!(sys_vars->rank)) {
+		dims1D[0] = Nx;
+		if ( (H5LTmake_dataset(file_info->output_file_handle, "x", D1, dims1D, H5T_NATIVE_DOUBLE, x0)) < 0) {
+			printf("\n["MAGENTA"WARNING"RESET"] --- Failed to make dataset ["CYAN"%s"RESET"]\n", "x");
+		}
+		dims1D[0] = Ny;
+		if ( (H5LTmake_dataset(file_info->output_file_handle, "y", D1, dims1D, H5T_NATIVE_DOUBLE, run_data->x[1]))< 0) {
+			printf("\n["MAGENTA"WARNING"RESET"] --- Failed to make dataset ["CYAN"%s"RESET"]\n", "y");
+		}
+		dims1D[0] = Nz;
+		if ( (H5LTmake_dataset(file_info->output_file_handle, "z", D1, dims1D, H5T_NATIVE_DOUBLE, run_data->x[2]))< 0) {
+			printf("\n["MAGENTA"WARNING"RESET"] --- Failed to make dataset ["CYAN"%s"RESET"]\n", "z");
+		}
+	}
+	fftw_free(x0);
+	#endif
+
+	// -------------------------------
+	// Write System Measures
+	// -------------------------------
+	// Time
+	#if defined(__TIME)
+	// Time array only on rank 0
+	if (!(sys_vars->rank)) {
+		dims1D[0] = sys_vars->num_print_steps;
+		if ( (H5LTmake_dataset(file_info->output_file_handle, "Time", D1, dims1D, H5T_NATIVE_DOUBLE, run_data->time)) < 0) {
+			printf("\n["MAGENTA"WARNING"RESET"] --- Failed to make dataset ["CYAN"%s"RESET"]\n", "Time");
+		}
+	}
+	#endif
+
+	
+	// System measures -> need to reduce (in place on rank 0) all arrays across the processess
+	if (!(sys_vars->rank)) {
+		// Reduce on to rank 0
+		#if defined(__SYS_MEASURES)
+		MPI_Reduce(MPI_IN_PLACE, run_data->tot_energy, sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		MPI_Reduce(MPI_IN_PLACE, run_data->tot_enstr, sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		MPI_Reduce(MPI_IN_PLACE, run_data->tot_palin, sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		MPI_Reduce(MPI_IN_PLACE, run_data->tot_heli, sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		// MPI_Reduce(MPI_IN_PLACE, run_data->enrg_diss, sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		// MPI_Reduce(MPI_IN_PLACE, run_data->enst_diss, sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		#endif
+		// #if defined(__ENST_FLUX)
+		// MPI_Reduce(MPI_IN_PLACE, run_data->enst_flux_sbst, sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		// MPI_Reduce(MPI_IN_PLACE, run_data->enst_flux_sbst, sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		// #endif
+		// #if defined(__ENRG_FLUX)
+		// MPI_Reduce(MPI_IN_PLACE, run_data->enrg_flux_sbst, sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		// MPI_Reduce(MPI_IN_PLACE, run_data->enrg_flux_sbst, sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		// #endif
+
+		// Dataset dims
+		dims1D[0] = sys_vars->num_print_steps;
+
+		#if defined(__SYS_MEASURES)
+		// Energy
+		if ( (H5LTmake_dataset(file_info->output_file_handle, "TotalEnergy", D1, dims1D, H5T_NATIVE_DOUBLE, run_data->tot_energy)) < 0) {
+			printf("\n["MAGENTA"WARNING"RESET"] --- Failed to make dataset ["CYAN"%s"RESET"]\n", "TotalEnergy");
+		}
+		// Enstrophy
+		if ( (H5LTmake_dataset(file_info->output_file_handle, "TotalEnstrophy", D1, dims1D, H5T_NATIVE_DOUBLE, run_data->tot_enstr)) < 0) {
+			printf("\n["MAGENTA"WARNING"RESET"] --- Failed to make dataset ["CYAN"%s"RESET"]\n", "TotalEnstrophy");
+		}
+		// Palinstrophy
+		if ( (H5LTmake_dataset(file_info->output_file_handle, "TotalPalinstrophy", D1, dims1D, H5T_NATIVE_DOUBLE, run_data->tot_palin)) < 0) {
+			printf("\n["MAGENTA"WARNING"RESET"] --- Failed to make dataset ["CYAN"%s"RESET"]\n", "TotalPalinstrophy");
+		}
+		// Helicity
+		if ( (H5LTmake_dataset(file_info->output_file_handle, "TotalHelicity", D1, dims1D, H5T_NATIVE_DOUBLE, run_data->tot_heli)) < 0) {
+			printf("\n["MAGENTA"WARNING"RESET"] --- Failed to make dataset ["CYAN"%s"RESET"]\n", "TotalHelicity");
+		}
+		// // Energy dissipation rate
+		// if ( (H5LTmake_dataset(file_info->output_file_handle, "EnergyDissipation", D1, dims1D, H5T_NATIVE_DOUBLE, run_data->enrg_diss)) < 0) {
+		// 	printf("\n["MAGENTA"WARNING"RESET"] --- Failed to make dataset ["CYAN"%s"RESET"]\n", "EnergyDissipation");
+		// }
+		// // Enstrophy dissipation rate
+		// if ( (H5LTmake_dataset(file_info->output_file_handle, "EnstrophyDissipation", D1, dims1D, H5T_NATIVE_DOUBLE, run_data->enst_diss)) < 0) {
+		// 	printf("\n["MAGENTA"WARNING"RESET"] --- Failed to make dataset ["CYAN"%s"RESET"]\n", "EnstrophyDissipation");
+		// }
+		#endif
+		// #if defined(__ENST_FLUX)
+		// // Enstrophy flux in/out of a subset of modes
+		// if ( (H5LTmake_dataset(file_info->output_file_handle, "EnstrophyFluxSubset", D1, dims1D, H5T_NATIVE_DOUBLE, run_data->enst_flux_sbst)) < 0) {
+		// 	printf("\n["MAGENTA"WARNING"RESET"] --- Failed to make dataset ["CYAN"%s"RESET"]\n", "EnstrophyFluxSubset");
+		// }
+		// // Enstrophy dissipation of a subset of modes
+		// if ( (H5LTmake_dataset(file_info->output_file_handle, "EnstrophyDissSubset", D1, dims1D, H5T_NATIVE_DOUBLE, run_data->enst_diss_sbst)) < 0) {
+		// 	printf("\n["MAGENTA"WARNING"RESET"] --- Failed to make dataset ["CYAN"%s"RESET"]\n", "EnstrophyDissSubset");
+		// }
+		// #endif
+		// #if defined(__ENRG_FLUX)
+		// // Energy flux in/out of a subset of modes
+		// if ( (H5LTmake_dataset(file_info->output_file_handle, "EnergyFluxSubset", D1, dims1D, H5T_NATIVE_DOUBLE, run_data->enrg_flux_sbst)) < 0) {
+		// 	printf("\n["MAGENTA"WARNING"RESET"] --- Failed to make dataset ["CYAN"%s"RESET"]\n", "EnergyFluxSubset");
+		// }
+		// // Energy dissipation of a subset of modes
+		// if ( (H5LTmake_dataset(file_info->output_file_handle, "EnergyDissSubset", D1, dims1D, H5T_NATIVE_DOUBLE, run_data->enrg_diss_sbst)) < 0) {
+		// 	printf("\n["MAGENTA"WARNING"RESET"] --- Failed to make dataset ["CYAN"%s"RESET"]\n", "EnergyDissSubset");
+		// }
+		// #endif
+	}
+	else {
+		// Reduce all other process to rank 0
+		#if defined(__SYS_MEASURES)
+		MPI_Reduce(run_data->tot_energy, NULL,  sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		MPI_Reduce(run_data->tot_enstr, NULL, sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		MPI_Reduce(run_data->tot_palin, NULL, sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		MPI_Reduce(run_data->tot_heli, NULL, sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		// MPI_Reduce(run_data->enrg_diss, NULL, sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		// MPI_Reduce(run_data->enst_diss, NULL, sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		#endif
+		// #if defined(__ENST_FLUX)
+		// MPI_Reduce(run_data->enst_flux_sbst, NULL, sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		// MPI_Reduce(run_data->enst_diss_sbst, NULL, sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		// #endif
+		// #if defined(__ENRG_FLUX)
+		// MPI_Reduce(run_data->enrg_flux_sbst, NULL, sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		// MPI_Reduce(run_data->enrg_diss_sbst, NULL, sys_vars->num_print_steps, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		// #endif
+	}
+
+	// -----------------------------------
+	// Close Files for the final time
+	// -----------------------------------
+	if (!(sys_vars->rank)) {
+		status = H5Fclose(file_info->output_file_handle);
+		if (status < 0) {
+			fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to close main output file: "CYAN"%s"RESET" \n-->>Exiting....n", file_info->output_file_name);
+			exit(1);
+		}
+	}
+	#if defined(DEBUG)
+	if (!sys_vars->rank) {
+		// Close test / debug file
+	    H5Fclose(file_info->test_file_handle);
+	}
+	#endif
+	#if defined(__VORT_FOUR) || defined(__MODES)
+	// Close the complex datatype identifier
+	H5Tclose(file_info->COMPLEX_DTYPE);
+	#endif
 }
 /**
  * Wrapper function used to create a Group for the current iteration in the HDF5 file 

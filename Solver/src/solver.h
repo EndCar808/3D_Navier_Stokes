@@ -34,7 +34,13 @@ double DPMin(double a, double b);
 void RK4Step(const double dt, const long int* N, const ptrdiff_t local_Nx, RK_data_struct* RK_data);
 #endif
 void NonlinearRHSBatch(fftw_complex* u_hat, fftw_complex* dw_hat_dt, double* curl, double* u, double* vort);
+double TotalEnergy(void);
+double TotalEnstrophy(void);
+double TotalHelicity(void);
+double TotalPalinstrophy(void);
+void ComputeSystemTotals(int iter);
 void InitializeSystemMeasurables(RK_data_struct* RK_data);
+void RecordSystemMeasures(double t, int print_indx, RK_data_struct* RK_data);
 void InitializeIntegrationVariables(double* t0, double* t, double* dt, double* T, long int* trans_steps);
 void InitialConditions(fftw_complex* u_hat, double* u, const long int* N);
 void ApplyDealiasing(fftw_complex* array, int array_dim, const long int* N);

@@ -157,12 +157,12 @@ void SpectralSolve(void) {
 		// Write To File
 		// -------------------------------
 		if ((iters > trans_steps) && (iters % sys_vars->SAVE_EVERY == 0)) {
-			// #if defined(TESTING)
-			// TaylorGreenSoln(t, N);
-			// #endif
+			#if defined(TESTING)
+			TaylorGreenSoln(t, N);
+			#endif
 
-			// // Record System Measurables
-			// RecordSystemMeasures(t, save_data_indx, RK_data);
+			// Record System Measurables
+			RecordSystemMeasures(t, save_data_indx, RK_data);
 
 			// Write the appropriate datasets to file
 			WriteDataToFile(t, dt, save_data_indx);
@@ -726,6 +726,331 @@ void NonlinearRHSBatch(fftw_complex* u_hat, fftw_complex* dw_hat_dt, double* cur
  	// ApplyForcing(dw_hat_dt, sys_vars->N);
 }
 /**
+ * Function to compute the total energy in the system at the current timestep
+ * @return  The total energy in the system
+ */
+double TotalEnergy(void) {
+
+	// Initialize variables
+	int tmp1, tmp2;
+	int indx;
+	double tot_energy = 0.0;
+	ptrdiff_t local_Nx 		  = sys_vars->local_Nx;
+	const long int Nx         = sys_vars->N[0];
+	const long int Ny         = sys_vars->N[1];
+	const long int Nz         = sys_vars->N[2];
+	const long int Nz_Fourier = sys_vars->N[2] / 2 + 1;
+	double norm_fac = 0.5 / pow(Nx * Ny * Nz, 2.0);
+
+	// ------------------------------------------
+	// Compute Energy in Fourier Space
+	// ------------------------------------------
+	for (int i = 0; i < local_Nx; ++i) {
+		tmp1 = i * Ny;
+		for (int j = 0; j < Ny; ++j) {
+			tmp2 = Nz_Fourier * (tmp1 + j);
+			for (int k = 0; k < Ny; ++k) {
+				indx = tmp2 + k;
+
+				if ((k == 0) || (k == Nz_Fourier - 1)) {
+					// Update the sum for the total energy
+					tot_energy += cabs(run_data->u_hat[SYS_DIM * indx + 0] * conj(run_data->u_hat[SYS_DIM * indx + 0]));
+					tot_energy += cabs(run_data->u_hat[SYS_DIM * indx + 1] * conj(run_data->u_hat[SYS_DIM * indx + 1]));
+					tot_energy += cabs(run_data->u_hat[SYS_DIM * indx + 2] * conj(run_data->u_hat[SYS_DIM * indx + 2]));
+				}
+				else {
+					// Update the sum for the total energy
+					tot_energy += 2.0 * cabs(run_data->u_hat[SYS_DIM * indx + 0] * conj(run_data->u_hat[SYS_DIM * indx + 0])); 
+					tot_energy += 2.0 * cabs(run_data->u_hat[SYS_DIM * indx + 1] * conj(run_data->u_hat[SYS_DIM * indx + 1]));
+					tot_energy += 2.0 * cabs(run_data->u_hat[SYS_DIM * indx + 2] * conj(run_data->u_hat[SYS_DIM * indx + 2]));
+				}
+			}
+		}
+	}
+	
+	// Return result
+	return 8.0 * pow(M_PI, 3.0) * tot_energy * norm_fac;
+}
+/**
+ * Function to compute the total enstrophy in the system at the current timestep
+ * @return  The total enstrophy in the system
+ */
+double TotalEnstrophy(void) {
+
+	// Initialize variables
+	int tmp1, tmp2;
+	int indx;
+	double tot_enst = 0.0;
+	ptrdiff_t local_Nx 		  = sys_vars->local_Nx;
+	const long int Nx         = sys_vars->N[0];
+	const long int Ny         = sys_vars->N[1];
+	const long int Nz         = sys_vars->N[2];
+	const long int Nz_Fourier = sys_vars->N[2] / 2 + 1;
+	double norm_fac = 0.5 / pow(Nx * Ny * Nz, 2.0);
+	fftw_complex w_hat_x, w_hat_y, w_hat_z;
+
+	// --------------------------------------------------
+	// Compute Vorticity and Enstrophy in Fourier Space
+	// --------------------------------------------------
+	for (int i = 0; i < local_Nx; ++i) {
+		tmp1 = i * Ny;
+		for (int j = 0; j < Ny; ++j) {
+			tmp2 = Nz_Fourier * (tmp1 + j);
+			for (int k = 0; k < Ny; ++k) {
+				indx = tmp2 + k;
+
+				// Compute the Fourier space vorticity
+				w_hat_x = I * (run_data->k[1][j] * run_data->u_hat[SYS_DIM * indx + 2] - run_data->k[2][k] * run_data->u_hat[SYS_DIM * indx + 1]);
+				w_hat_y = I * (run_data->k[2][k] * run_data->u_hat[SYS_DIM * indx + 0] - run_data->k[0][i] * run_data->u_hat[SYS_DIM * indx + 2]);
+				w_hat_z = I * (run_data->k[0][i] * run_data->u_hat[SYS_DIM * indx + 1] - run_data->k[1][j] * run_data->u_hat[SYS_DIM * indx + 0]);
+
+				if ((k == 0) || (k == Nz_Fourier - 1)) {
+					// Update the sum for the total enstrophy
+					tot_enst += cabs(w_hat_x * conj(w_hat_x));
+					tot_enst += cabs(w_hat_y * conj(w_hat_y));
+					tot_enst += cabs(w_hat_z * conj(w_hat_z));
+				}
+				else {
+					// Update the sum for the total enstrophy
+					tot_enst += 2.0 * cabs(w_hat_x * conj(w_hat_x)); 
+					tot_enst += 2.0 * cabs(w_hat_y * conj(w_hat_y));
+					tot_enst += 2.0 * cabs(w_hat_z * conj(w_hat_z));
+				}
+			}
+		}
+	}
+	
+	// Return result
+	return 8.0 * pow(M_PI, 3.0) * tot_enst * norm_fac;
+}
+/**
+ * Function to compute the total helicity in the system at the current timestep
+ * @return  The total helicity in the system
+ */
+double TotalHelicity(void) {
+
+	// Initialize variables
+	int tmp1, tmp2;
+	int indx;
+	double tot_heli = 0.0;
+	ptrdiff_t local_Nx 		  = sys_vars->local_Nx;
+	const long int Nx         = sys_vars->N[0];
+	const long int Ny         = sys_vars->N[1];
+	const long int Nz         = sys_vars->N[2];
+	const long int Nz_Fourier = sys_vars->N[2] / 2 + 1;
+	double norm_fac = 0.5 / pow(Nx * Ny * Nz, 2.0);
+	fftw_complex w_hat_x, w_hat_y, w_hat_z;
+
+	// --------------------------------------------------
+	// Compute Vorticity and Enstrophy in Fourier Space
+	// --------------------------------------------------
+	for (int i = 0; i < local_Nx; ++i) {
+		tmp1 = i * Ny;
+		for (int j = 0; j < Ny; ++j) {
+			tmp2 = Nz_Fourier * (tmp1 + j);
+			for (int k = 0; k < Ny; ++k) {
+				indx = tmp2 + k;
+
+				// Compute the Fourier space vorticity
+				w_hat_x = I * (run_data->k[1][j] * run_data->u_hat[SYS_DIM * indx + 2] - run_data->k[2][k] * run_data->u_hat[SYS_DIM * indx + 1]);
+				w_hat_y = I * (run_data->k[2][k] * run_data->u_hat[SYS_DIM * indx + 0] - run_data->k[0][i] * run_data->u_hat[SYS_DIM * indx + 2]);
+				w_hat_z = I * (run_data->k[0][i] * run_data->u_hat[SYS_DIM * indx + 1] - run_data->k[1][j] * run_data->u_hat[SYS_DIM * indx + 0]);
+
+				if ((k == 0) || (k == Nz_Fourier - 1)) {
+					// Update the sum for the total helicity
+					tot_heli += run_data->u_hat[SYS_DIM * indx + 0] * w_hat_x;
+					tot_heli += run_data->u_hat[SYS_DIM * indx + 1] * w_hat_y;
+					tot_heli += run_data->u_hat[SYS_DIM * indx + 2] * w_hat_z;
+				}
+				else {
+					// Update the sum for the total heli
+					tot_heli += 2.0 * run_data->u_hat[SYS_DIM * indx + 0] * w_hat_x; 
+					tot_heli += 2.0 * run_data->u_hat[SYS_DIM * indx + 1] * w_hat_y;
+					tot_heli += 2.0 * run_data->u_hat[SYS_DIM * indx + 2] * w_hat_z;
+				}
+			}
+		}
+	}
+	
+	// Return result
+	return 8.0 * pow(M_PI, 3.0) * tot_heli * norm_fac;
+}
+/**
+ * Function to compute the total palinstrophy in the system at the current timestep
+ * @return  The total palinstrophy in the system
+ */
+double TotalPalinstrophy(void) {
+
+	// Initialize variables
+	int tmp1, tmp2;
+	int indx;
+	double tot_palin = 0.0;
+	ptrdiff_t local_Nx 		  = sys_vars->local_Nx;
+	const long int Nx         = sys_vars->N[0];
+	const long int Ny         = sys_vars->N[1];
+	const long int Nz         = sys_vars->N[2];
+	const long int Nz_Fourier = sys_vars->N[2] / 2 + 1;
+	double norm_fac = 0.5 / pow(Nx * Ny * Nz, 2.0);
+	fftw_complex w_hat_x, w_hat_y, w_hat_z;
+	fftw_complex curl_hat_x, curl_hat_y, curl_hat_z;
+
+	// --------------------------------------------------
+	// Compute Vorticity and Enstrophy in Fourier Space
+	// --------------------------------------------------
+	for (int i = 0; i < local_Nx; ++i) {
+		tmp1 = i * Ny;
+		for (int j = 0; j < Ny; ++j) {
+			tmp2 = Nz_Fourier * (tmp1 + j);
+			for (int k = 0; k < Ny; ++k) {
+				indx = tmp2 + k;
+
+				// Compute the Fourier space vorticity
+				w_hat_x = I * (run_data->k[1][j] * run_data->u_hat[SYS_DIM * indx + 2] - run_data->k[2][k] * run_data->u_hat[SYS_DIM * indx + 1]);
+				w_hat_y = I * (run_data->k[2][k] * run_data->u_hat[SYS_DIM * indx + 0] - run_data->k[0][i] * run_data->u_hat[SYS_DIM * indx + 2]);
+				w_hat_z = I * (run_data->k[0][i] * run_data->u_hat[SYS_DIM * indx + 1] - run_data->k[1][j] * run_data->u_hat[SYS_DIM * indx + 0]);
+
+				// Take the curl of the Fourier space vorticity
+				curl_hat_x = I * (run_data->k[1][j] * w_hat_z - run_data->k[2][k] * w_hat_y);
+				curl_hat_y = I * (run_data->k[2][k] * w_hat_x - run_data->k[0][i] * w_hat_z);
+				curl_hat_z = I * (run_data->k[0][i] * w_hat_y - run_data->k[1][j] * w_hat_x);
+
+				if ((k == 0) || (k == Nz_Fourier - 1)) {
+					// Update the sum for the total palinstrophy
+					tot_palin += cabs(curl_hat_x * conj(curl_hat_x));
+					tot_palin += cabs(curl_hat_y * conj(curl_hat_y));
+					tot_palin += cabs(curl_hat_z * conj(curl_hat_z));
+				}
+				else {
+					// Update the sum for the total palinstrophy
+					tot_palin += 2.0 * cabs(curl_hat_x * conj(curl_hat_x)); 
+					tot_palin += 2.0 * cabs(curl_hat_y * conj(curl_hat_y));
+					tot_palin += 2.0 * cabs(curl_hat_z * conj(curl_hat_z));
+				}
+			}
+		}
+	}
+	
+	// Return result
+	return 8.0 * pow(M_PI, 3.0) * tot_palin * norm_fac;
+}
+/**
+ * Function to compute the system totals such as energy, enstrophy, palinstrophy, helicity at once on the local processes at the current timestep
+ */
+void ComputeSystemTotals(int iter) {
+
+	// Initialize variables
+	int tmp1, tmp2;
+	int indx;
+	ptrdiff_t local_Nx 		  = sys_vars->local_Nx;
+	const long int Nx         = sys_vars->N[0];
+	const long int Ny         = sys_vars->N[1];
+	const long int Nz         = sys_vars->N[2];
+	const long int Nz_Fourier = sys_vars->N[2] / 2 + 1;
+	double norm_fac = 0.5 / pow(Nx * Ny * Nz, 2.0);
+	fftw_complex w_hat_x, w_hat_y, w_hat_z;
+	fftw_complex curl_hat_x, curl_hat_y, curl_hat_z;
+
+	// ------------------------------------
+	// Compute Totals in Fourier Space
+	// ------------------------------------
+	for (int i = 0; i < local_Nx; ++i) {
+		tmp1 = i * Ny;
+		for (int j = 0; j < Ny; ++j) {
+			tmp2 = Nz_Fourier * (tmp1 + j);
+			for (int k = 0; k < Ny; ++k) {
+				indx = tmp2 + k;
+
+				// Compute the Fourier space vorticity
+				w_hat_x = I * (run_data->k[1][j] * run_data->u_hat[SYS_DIM * indx + 2] - run_data->k[2][k] * run_data->u_hat[SYS_DIM * indx + 1]);
+				w_hat_y = I * (run_data->k[2][k] * run_data->u_hat[SYS_DIM * indx + 0] - run_data->k[0][i] * run_data->u_hat[SYS_DIM * indx + 2]);
+				w_hat_z = I * (run_data->k[0][i] * run_data->u_hat[SYS_DIM * indx + 1] - run_data->k[1][j] * run_data->u_hat[SYS_DIM * indx + 0]);
+
+				// Take the curl of the Fourier space vorticity
+				curl_hat_x = I * (run_data->k[1][j] * w_hat_z - run_data->k[2][k] * w_hat_y);
+				curl_hat_y = I * (run_data->k[2][k] * w_hat_x - run_data->k[0][i] * w_hat_z);
+				curl_hat_z = I * (run_data->k[0][i] * w_hat_y - run_data->k[1][j] * w_hat_x);
+
+				if ((k == 0) || (k == Nz_Fourier - 1)) {
+					// Update the sum for the totals
+					run_data->tot_enstr[iter]  += cabs(w_hat_x * conj(w_hat_x)) + cabs(w_hat_y * conj(w_hat_y)) + cabs(w_hat_z * conj(w_hat_z));
+					run_data->tot_palin[iter]  += cabs(curl_hat_x * conj(curl_hat_x)) + cabs(curl_hat_y * conj(curl_hat_y)) + cabs(curl_hat_z * conj(curl_hat_z));
+					run_data->tot_heli[iter]   += run_data->u_hat[SYS_DIM * indx + 0] * w_hat_x + run_data->u_hat[SYS_DIM * indx + 1] * w_hat_y + run_data->u_hat[SYS_DIM * indx + 2] * w_hat_z;
+					run_data->tot_energy[iter] += cabs(run_data->u_hat[SYS_DIM * indx + 0] * conj(run_data->u_hat[SYS_DIM * indx + 0])) + cabs(run_data->u_hat[SYS_DIM * indx + 1] * conj(run_data->u_hat[SYS_DIM * indx + 1])) + cabs(run_data->u_hat[SYS_DIM * indx + 2] * conj(run_data->u_hat[SYS_DIM * indx + 2]));
+				}
+				else {
+					// Update the sum for the totals
+					run_data->tot_enstr[iter]  += 2.0 * cabs(w_hat_x * conj(w_hat_x)) + cabs(w_hat_y * conj(w_hat_y)) + cabs(w_hat_z * conj(w_hat_z));
+					run_data->tot_palin[iter]  += 2.0 * cabs(curl_hat_x * conj(curl_hat_x)) + cabs(curl_hat_y * conj(curl_hat_y)) + cabs(curl_hat_z * conj(curl_hat_z));
+					run_data->tot_heli[iter]   += 2.0 * run_data->u_hat[SYS_DIM * indx + 0] * w_hat_x + run_data->u_hat[SYS_DIM * indx + 1] * w_hat_y + run_data->u_hat[SYS_DIM * indx + 2] * w_hat_z;
+					run_data->tot_energy[iter] += 2.0 * cabs(run_data->u_hat[SYS_DIM * indx + 0] * conj(run_data->u_hat[SYS_DIM * indx + 0])) + cabs(run_data->u_hat[SYS_DIM * indx + 1] * conj(run_data->u_hat[SYS_DIM * indx + 1])) + cabs(run_data->u_hat[SYS_DIM * indx + 2] * conj(run_data->u_hat[SYS_DIM * indx + 2]));				
+				}
+			}
+		}
+	}
+	
+	// Normalize results and take into account computation in Fourier space
+	run_data->tot_enstr[iter]  *= 8.0 * pow(M_PI, 3.0) * norm_fac;
+	run_data->tot_palin[iter]  *= 8.0 * pow(M_PI, 3.0) * norm_fac;
+	run_data->tot_heli[iter]   *= 8.0 * pow(M_PI, 3.0) * norm_fac;
+	run_data->tot_energy[iter] *= 8.0 * pow(M_PI, 3.0) * norm_fac;
+}
+/**
+ * Function to record the system measures for the current timestep 
+ * @param t          The current time in the simulation
+ * @param print_indx The current index of the measurables arrays
+ * @param RK_data 	 The Runge-Kutta struct containing the arrays to compute the nonlinear term for the fluxes
+ */
+void RecordSystemMeasures(double t, int print_indx, RK_data_struct* RK_data) {
+
+	// -------------------------------
+	// Record the System Measures 
+	// -------------------------------
+	// The integration time
+	#if defined(__TIME)
+	if (!(sys_vars->rank)) {
+		run_data->time[print_indx] = t;
+	}
+	#endif
+
+	// Check if within memory limits
+	if (print_indx < sys_vars->num_print_steps) {
+		#if defined(__SYS_MEASURES)
+		// System totals: energy, enstrophy, palinstrophy, helicity
+		ComputeSystemTotals(print_indx);
+		// // Energy and enstrophy dissipation rates
+		// run_data->enrg_diss[print_indx] = EnergyDissipationRate();
+		// run_data->enst_diss[print_indx] = EnstrophyDissipationRate();
+		#endif
+		#if defined(__ENST_FLUX)
+		// Enstrophy and energy flux in/out and dissipation of a subset of modes
+		// EnstrophyFlux(&(run_data->enst_flux_sbst[print_indx]), &(run_data->enst_diss_sbst[print_indx]), RK_data);
+		#endif
+		#if defined(__ENRG_FLUX)
+		// EnergyFlux(&(run_data->enrg_flux_sbst[print_indx]), &(run_data->enrg_diss_sbst[print_indx]), RK_data);
+		#endif
+	}
+	else {
+		printf("\n["MAGENTA"WARNING"RESET"] --- Unable to write system measures at Indx: [%d] t: [%lf] ---- Number of intergration steps is now greater then memory allocated\n", print_indx, t);
+	}
+	
+	// // -------------------------------
+	// // Record the Spectra 
+	// // -------------------------------
+	// // Call spectra functions
+	// #if defined(__ENST_SPECT )
+	// EnstrophySpectrum();
+	// #endif
+	// #if defined(__ENRG_SPECT)
+	// EnergySpectrum();
+	// #endif
+	// #if defined(__ENRG_FLUX_SPECT)
+	// EnergyFluxSpectrum(RK_data);
+	// #endif
+	// #if defined(__ENST_FLUX_SPECT)
+	// EnstrophyFluxSpectrum(RK_data);
+	// #endif
+}
+/**
  * Function to initialize all the integration time variables
  * @param t0           The initial time of the simulation
  * @param t            The current time of the simulaiton
@@ -830,7 +1155,14 @@ void InitializeSystemMeasurables(RK_data_struct* RK_data) {
 	if (run_data->tot_palin == NULL) {
 		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for the ["CYAN"%s"RESET"]\n-->> Exiting!!!\n", "Total Palinstrophy");
 		exit(1);
-	}	
+	}
+
+	// Total Helicity
+	run_data->tot_heli = (double* )fftw_malloc(sizeof(double) * print_steps);
+	if (run_data->tot_heli == NULL) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for the ["CYAN"%s"RESET"]\n-->> Exiting!!!\n", "Total Helicity");
+		exit(1);
+	}
 
 	// Energy Dissipation Rate
 	run_data->enrg_diss = (double* )fftw_malloc(sizeof(double) * print_steps);
@@ -919,25 +1251,19 @@ void InitializeSystemMeasurables(RK_data_struct* RK_data) {
 	}	
 	#endif
 
-	// // ----------------------------
-	// // Get Measurables of the ICs
-	// // ----------------------------
-	// #if defined(__SYS_MEASURES)
-	// // Total Energy
-	// run_data->tot_energy[0] = TotalEnergy();
-
-	// // Total Enstrophy
-	// run_data->tot_enstr[0] = TotalEnstrophy();
-
-	// // Total Palinstrophy
-	// run_data->tot_palin[0] = TotalPalinstrophy();
+	// ----------------------------
+	// Get Measurables of the ICs
+	// ----------------------------
+	#if defined(__SYS_MEASURES)
+	// Compute system quantities
+	ComputeSystemTotals(0);
 
 	// // Energy dissipation rate
 	// run_data->enrg_diss[0] = EnergyDissipationRate();
 
 	// // Enstrophy dissipation rate
 	// run_data->enst_diss[0] = EnstrophyDissipationRate();
-	// #endif
+	#endif
 	// #if defined(__ENST_FLUX)
 	// // Enstrophy Flux and dissipation from/to Subset of modes
 	// EnstrophyFlux(&(run_data->enst_flux_sbst[0]), &(run_data->enst_diss_sbst[0]), RK_data);
@@ -1449,6 +1775,7 @@ void FreeMemory(RK_data_struct* RK_data) {
 	fftw_free(run_data->tot_energy);
 	fftw_free(run_data->tot_enstr);
 	fftw_free(run_data->tot_palin);
+	fftw_free(run_data->tot_heli);
 	fftw_free(run_data->enrg_diss);
 	fftw_free(run_data->enst_diss);
 	#endif
