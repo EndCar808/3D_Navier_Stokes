@@ -54,8 +54,8 @@
 // define __PHASE_ONLY
 // Choose which integrator to use
 // #define __RK4
-#define __RK5
-// #define __DPRK5
+// #define __RK5
+#define __DPRK5
 // Choose to turn of adaptive stepping or not 
 // #define __ADAPTIVE_STEP
 // #define __CFL_STEP

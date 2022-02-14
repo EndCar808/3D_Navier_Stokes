@@ -39,7 +39,7 @@ static const double RK5_C2 = 0.2, 	  RK5_A21 = 0.2, \
 				  	RK5_C6 = 1.0,     RK5_A61 = 9017.0/3168.0,  RK5_A62 = -355.0/33.0,     RK5_A63 = 46732.0/5247.0, RK5_A64 = 49.0/176.0,    RK5_A65 = -5103.0/18656.0, \
 				  	RK5_C7 = 1.0,     RK5_A71 = 35.0/384.0,								   RK5_A73 = 500.0/1113.0,   RK5_A74 = 125.0/192.0,   RK5_A75 = -2187.0/6784.0,    RK5_A76 = 11.0/84.0, \
 				              		  RK5_B1  = 35.0/384.0, 							   RK5_B3  = 500.0/1113.0,   RK5_B4  = 125.0/192.0,   RK5_B5  = -2187.0/6784.0,    RK5_B6  = 11.0/84.0, \
-				              		  RK5_Bs1 = 5179.0/57600.0, 						   RK5_Bs3 = 7571.0/16695.0, RK5_Bs4 = 393.0/640.0,   RK_Bs5  = -92097.0/339200.0, RK5_Bs6 = 187.0/2100.0, RK5_Bs7 = 1.0/40.0;
+				              		  RK5_Bs1 = 5179.0/57600.0, 						   RK5_Bs3 = 7571.0/16695.0, RK5_Bs4 = 393.0/640.0,   RK5_Bs5 = -92097.0/339200.0, RK5_Bs6 = 187.0/2100.0, RK5_Bs7 = 1.0/40.0;
 #endif
 // ---------------------------------------------------------------------
 //  Function Definitions
@@ -63,7 +63,7 @@ void SpectralSolve(void) {
 	// Allocate memory
 	// -------------------------------
 	AllocateMemory(NBatch, RK_data);
-
+	
 	// -------------------------------
 	// FFTW Plans Setup
 	// -------------------------------
@@ -78,7 +78,6 @@ void SpectralSolve(void) {
 
 	// Get initial conditions
 	InitialConditions(run_data->u_hat, run_data->u, N);
-
 	// -------------------------------
 	// Integration Variables
 	// -------------------------------
@@ -88,6 +87,10 @@ void SpectralSolve(void) {
 	double dt;
 	double T;
 	long int trans_steps;
+	#if defined(__DPRK5)
+	int tries = 1;
+	double dt_new;
+	#endif
 
 	// Get timestep and other integration variables
 	InitializeIntegrationVariables(&t0, &t, &dt, &T, &trans_steps);
@@ -108,6 +111,7 @@ void SpectralSolve(void) {
 	// PrintUpdateToTerminal(0, t0, dt, T, 0);
 	// #endif
 
+
 	//////////////////////////////
 	// Begin Integration
 	//////////////////////////////
@@ -118,7 +122,7 @@ void SpectralSolve(void) {
 	#else
 	long int save_data_indx = 1;
 	#endif
-	while(t <= T) {
+	while(t <= dt) {
 
 		// -------------------------------	
 		// Perform Integration Step
@@ -128,17 +132,16 @@ void SpectralSolve(void) {
 		#elif defined(__RK5)
 		RK5DPStep(dt, N, iters, sys_vars->local_Nx, RK_data);
 		#elif defined(__DPRK5)
-		int tries = 0;
 		while (tries < DP_MAX_TRY) {
 			// Try a Dormand Prince step and compute the local error
 			RK5DPStep(dt, N, iters, sys_vars->local_Nx, RK_data);
 
 			// Compute the new timestep
-			dt_new = dt * DPMin(DP_DELTA_MAX, DPMax(DP_DELTA_MIN, DP_DELTA * pow(1.0 / RK_data->DP_errr, 0.2)))
+			dt_new = dt * DPMin(DP_DELTA_MAX, DPMax(DP_DELTA_MIN, DP_DELTA * pow(1.0 / RK_data->DP_err, 0.2)));
 			
 			// If error is bad repeat with smaller timestep, else move on
 			if (RK_data->DP_err <= 1.0) {
-				RK->DP_fails++;
+				RK_data->DP_fails++;
 				tries++;
 				dt = dt_new;
 				continue;
@@ -223,7 +226,7 @@ void RK5DPStep(const double dt, const long int* N, const int iters, const ptrdif
 	double dp_ho_step_x, dp_ho_step_y, dp_ho_step_z;
 	double err_sum_x, err_sum_y, err_sum_z;
 	double err_denom_x, err_denom_y, err_denom_z;
-	double err_x, err_y, err_z
+	double err_x, err_y, err_z;
 	#endif
 	
 	/////////////////////
@@ -1299,7 +1302,7 @@ void AllocateMemory(const long int* NBatch, RK_data_struct* RK_data) {
 		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for Integration Array ["CYAN"%s"RESET"] \n-->> Exiting!!!\n", "Vort");
 		exit(1);
 	}
-	#if defined(__RK5)
+	#if defined(__RK5) || defined(__DPRK5)
 	RK_data->RK5 = (fftw_complex* )fftw_malloc(sizeof(fftw_complex) * 2 * sys_vars->alloc_local_batch);
 	if (RK_data->RK5 == NULL) {
 		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for Integration Array ["CYAN"%s"RESET"] \n-->> Exiting!!!\n", "RK5");
