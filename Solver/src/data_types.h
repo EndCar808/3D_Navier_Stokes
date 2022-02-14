@@ -53,8 +53,8 @@
 // Indicate whether to do full or phase-only system
 // define __PHASE_ONLY
 // Choose which integrator to use
-#define __RK4
-// #define __RK5
+// #define __RK4
+#define __RK5
 // #define __DPRK5
 // Choose to turn of adaptive stepping or not 
 // #define __ADAPTIVE_STEP
@@ -68,10 +68,6 @@
 #if defined(__HYPER)
 #define HYPER_VISC				// Turned on hyperviscosity if called for at compilation time
 #define VIS_POW 2.0             // The power of the hyperviscosity -> 1.0 means no hyperviscosity
-#endif
-#if defined(__EKMN_DRAG)
-#define EKMN_DRAG     			// Turn on Ekman drag if called for at compilation time
-#define EKMN_POW -2.0 			// The power of the Eckman drag term -> 0.0 means no drag
 #endif
 #if defined(__PHASE_ONLY)		// Turn on phase only mode if called for at compilation
 #define PHASE_ONLY
@@ -123,6 +119,17 @@
 // These definitions define some of the solver parameters.
 #define SYS_DIM 3 				// The system dimension i.e., 2D
 #define TRANS_FRAC 0.2          // Fraction of time to ignore before saving to file
+// Dormand Prince integrator parameters
+#define DP_ABS_TOL 1e-7		    // The absolute error tolerance for the Dormand Prince Scheme
+#define DP_REL_TOL 1e-7         // The relative error tolerance for the Dormand Prince Scheme
+#define DP_DELTA_MIN 0.01       // The min delta value for the Dormand Prince scheme
+#define DP_DELTA_MAX 1.5 		// The max delta value for the Dormand Prince scheme
+#define DP_DELTA 0.8 			// The scaling parameter of the error for the Dormand Prince Scheme
+#define DP_MAX_TRY 20           // The maximum number of step tries before giving up
+// System checking parameters
+#define MIN_STEP_SIZE 1e-10 	// The minimum allowed stepsize for the solver 
+#define MAX_ITERS 1e+12			// The maximum iterations to perform
+#define MAX_VORT_LIM 1e+100     // The maximum allowed vorticity
 // System checking parameters
 #define MIN_STEP_SIZE 1e-10 	// The minimum allowed stepsize for the solver 
 #define MAX_ITERS 1e+12			// The maximum iterations to perform

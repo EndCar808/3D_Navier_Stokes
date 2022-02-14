@@ -53,7 +53,7 @@ int GetCMLArgs(int argc, char** argv) {
     sys_vars->N[2] = 64;
     // Integration time 
     sys_vars->t0        = 0.0;
-    sys_vars->dt        = 1e-4;
+    sys_vars->dt        = 1e-3;
     sys_vars->T         = 1.0;
     sys_vars->CFL_CONST = sqrt(3);
     // Initial conditions

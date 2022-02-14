@@ -425,6 +425,105 @@ void GetOutputDirPath(void) {
 	MPI_Barrier(MPI_COMM_WORLD);
 }
 /**
+ * Wrapper function that writes the data to file by openining it, creating a group for the current iteration and writing the data under this group. The file is then closed again 
+ * @param t     The current time of the simulation
+ * @param dt    The current timestep being used
+ * @param iters The current iteration
+ */
+void WriteDataToFile(double t, double dt, long int iters) {
+
+	// Initialize Variables
+	int tmp;
+	int indx;
+	char group_name[128];
+	const long int Nx 		  = sys_vars->N[0];
+	const long int Ny 		  = sys_vars->N[1];
+	const long int Ny_Fourier = sys_vars->N[1] / 2 + 1;
+	herr_t status;
+	hid_t main_group_id;
+	#if defined(__ENST_SPECT) || defined(__ENRG_SPECT) || defined(__ENST_FLUX_SPECT) || defined(__ENRG_FLUX_SPECT)
+	hid_t spectra_group_id;
+	#endif
+	hid_t plist_id;
+	static const int d_set_rank2D = 2;
+	hsize_t dset_dims2D[d_set_rank2D];        // array to hold dims of the dataset to be created
+	hsize_t slab_dims2D[d_set_rank2D];	      // Array to hold the dimensions of the hyperslab
+	hsize_t mem_space_dims2D[d_set_rank2D];   // Array to hold the dimensions of the memoray space - for real data this will be different to slab_dims due to 0 padding
+	#if defined(__MODES) || defined(__REALSPACE)
+	static const int d_set_rank3D = 3;
+	hsize_t dset_dims3D[d_set_rank3D];        // array to hold dims of the dataset to be created
+	hsize_t slab_dims3D[d_set_rank3D];	      // Array to hold the dimensions of the hyperslab
+	hsize_t mem_space_dims3D[d_set_rank3D];   // Array to hold the dimensions of the memoray space - for real data this will be different to slab_dims due to 0 padding
+	#endif
+
+	// --------------------------------------
+	// Check if files exist and Open/Create
+	// --------------------------------------
+	// Create property list for setting parallel I/O access properties for file
+	plist_id = H5Pcreate(H5P_FILE_ACCESS);
+	H5Pset_fapl_mpio(plist_id, MPI_COMM_WORLD, MPI_INFO_NULL);
+
+	// Check if main file exists - open it if it does if not create it
+	if (access(file_info->output_file_name, F_OK) != 0) {
+		file_info->output_file_handle = H5Fcreate(file_info->output_file_name, H5F_ACC_TRUNC, H5P_DEFAULT, plist_id);
+		if (file_info->output_file_handle < 0) {
+			fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to create output file ["CYAN"%s"RESET"] at: Iter = ["CYAN"%ld"RESET"] t = ["CYAN"%lf"RESET"]\n-->> Exiting...\n", file_info->output_file_name, iters, t);
+			exit(1);
+		}
+	}
+	else {
+		// Open file with parallel I/O access properties
+		file_info->output_file_handle = H5Fopen(file_info->output_file_name, H5F_ACC_RDWR, plist_id);
+		if (file_info->output_file_handle < 0) {
+			fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to open output file ["CYAN"%s"RESET"] at: Iter = ["CYAN"%ld"RESET"] t = ["CYAN"%lf"RESET"]\n-->> Exiting...\n", file_info->output_file_name, iters, t);
+			exit(1);
+		}
+	}
+	H5Pclose(plist_id);
+
+	#if defined(__ENST_SPECT) || defined(__ENRG_SPECT) || defined(__ENST_FLUX_SPECT) || defined(__ENRG_FLUX_SPECT)
+	if (!sys_vars->rank) {
+		// Check if spectra file exists - open it if it does if not create it
+		if (access(file_info->output_file_name, F_OK) != 0) {
+			file_info->spectra_file_handle = H5Fcreate(file_info->spectra_file_name, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+			if (file_info->spectra_file_handle < 0) {
+				fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to create spectra file ["CYAN"%s"RESET"] at: Iter = ["CYAN"%ld"RESET"] t = ["CYAN"%lf"RESET"]\n-->> Exiting...\n", file_info->spectra_file_name, iters, t);
+				exit(1);
+			}
+		}
+		else {
+			// Open file with parallel I/O access properties
+			file_info->spectra_file_handle = H5Fopen(file_info->spectra_file_name, H5F_ACC_RDWR, H5P_DEFAULT);
+			if (file_info->spectra_file_handle < 0) {
+				fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to open spectra file ["CYAN"%s"RESET"] at: Iter = ["CYAN"%ld"RESET"] t = ["CYAN"%lf"RESET"]\n-->> Exiting...\n", file_info->spectra_file_name, iters, t);
+				exit(1);
+			}
+		}
+	}
+	#endif
+
+
+	// -------------------------------
+	// Close identifiers and File
+	// -------------------------------
+	status = H5Gclose(main_group_id);
+	status = H5Fclose(file_info->output_file_handle);
+	if (status < 0) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to close output file ["CYAN"%s"RESET"] at: Iter = ["CYAN"%ld"RESET"] t = ["CYAN"%lf"RESET"]\n-->> Exiting...\n", file_info->output_file_name, iters, t);
+		exit(1);
+	}
+	#if defined(__ENST_SPECT) || defined(__ENRG_SPECT) || defined(__ENST_FLUX_SPECT) || defined(__ENRG_FLUX_SPECT)
+	if (!sys_vars->rank) {
+		status = H5Gclose(spectra_group_id);
+		status = H5Fclose(file_info->spectra_file_handle);
+		if (status < 0) {
+			fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to close output file ["CYAN"%s"RESET"] at: Iter = ["CYAN"%ld"RESET"] t = ["CYAN"%lf"RESET"]\n-->> Exiting...\n", file_info->spectra_file_name, iters, t);
+			exit(1);		
+		}
+	}
+	#endif
+}
+/**
  * Function that creates a dataset in a created Group in the output file and writes the data to this dataset for Fourier Space arrays
  * @param group_id       The identifier of the Group for the current iteration to write the data to
  * @param dset_name      The name of the dataset to write

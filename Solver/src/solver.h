@@ -22,6 +22,14 @@
 // ---------------------------------------------------------------------
 // Main function for the pseudospectral solver
 void SpectralSolve(void);
+#if defined(__RK5) || defined(__DPRK5)
+void RK5DPStep(const double dt, const long int* N, const int iters, const ptrdiff_t local_Nx, RK_data_struct* RK_data);
+#endif
+#if defined(__DPRK5)
+double DPErrMax(double a, double b, double c);
+double DPMax(double a, double b);
+double DPMin(double a, double b);
+#endif
 #if defined(__RK4)
 void RK4Step(const double dt, const long int* N, const ptrdiff_t local_Nx, RK_data_struct* RK_data);
 #endif
