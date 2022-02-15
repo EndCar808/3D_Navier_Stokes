@@ -934,9 +934,120 @@ double TotalPalinstrophy(void) {
 	return 8.0 * pow(M_PI, 3.0) * tot_palin * norm_fac;
 }
 /**
- * Function to compute the system totals such as energy, enstrophy, palinstrophy, helicity at once on the local processes at the current timestep
+ * Function used to compute the Enstrophy spectrum of the current iteration. The energy spectrum is defined as all(sum) of the energy contained in concentric spherical shells in
+ * wavenumber space. 	
  */
-void ComputeSystemTotals(int iter) {
+void EnstrophySpectrum(void) {
+
+	// Initialize variables
+	int tmp1, tmp2;
+	int indx;
+	int spec_indx;
+	ptrdiff_t local_Nx 		  = sys_vars->local_Nx;
+	const long int Nx         = sys_vars->N[0];
+	const long int Ny         = sys_vars->N[1];
+	const long int Nz         = sys_vars->N[2];
+	const long int Nz_Fourier = sys_vars->N[2] / 2 + 1;
+	double norm_fac = 0.5 / pow(Nx * Ny * Nz, 2.0);
+    double const_fac = 8.0 * pow(M_PI, 3.0);
+    fftw_complex w_hat_x, w_hat_y, w_hat_z;
+
+	// ------------------------------------
+	// Initialize Spectrum Array
+	// ------------------------------------
+	for (int i = 0; i < sys_vars->n_spect; ++i) {
+		run_data->enst_spect[i] = 0.0;
+	}
+
+	// ------------------------------------
+	// Compute Spectrum
+	// ------------------------------------
+	for (int i = 0; i < local_Nx; ++i) {
+		tmp1 = i * Ny;
+		for (int j = 0; j < Ny; ++j) {
+			tmp2 = Nz_Fourier * (tmp1 + j);
+			for (int k = 0; k < Nz_Fourier; ++k) {
+				indx = tmp2 + k;
+
+				// Get spectrum index -> spectrum is computed by summing over the energy contained in concentric annuli in wavenumber space
+				spec_indx = (int) round( sqrt( (double)(run_data->k[0][i] * run_data->k[0][i] + run_data->k[1][j] * run_data->k[1][j] + run_data->k[2][k] * run_data->k[2][k])));
+
+				// Compute the Fourier space vorticity
+				w_hat_x = I * (run_data->k[1][j] * run_data->u_hat[SYS_DIM * indx + 2] - run_data->k[2][k] * run_data->u_hat[SYS_DIM * indx + 1]);
+				w_hat_y = I * (run_data->k[2][k] * run_data->u_hat[SYS_DIM * indx + 0] - run_data->k[0][i] * run_data->u_hat[SYS_DIM * indx + 2]);
+				w_hat_z = I * (run_data->k[0][i] * run_data->u_hat[SYS_DIM * indx + 1] - run_data->k[1][j] * run_data->u_hat[SYS_DIM * indx + 0]);
+
+				// Update the current bin with this mode
+				if ((k == 0) || (k == Nz_Fourier - 1)) { // These modes do not have conjugates so are counted once
+					run_data->enst_spect[spec_indx] += const_fac * norm_fac * (cabs(w_hat_x * conj(w_hat_x)) + cabs(w_hat_y * conj(w_hat_y)) + cabs(w_hat_z * conj(w_hat_z)));;
+				}
+				else { // These modes have conjugates so are counted twice
+					run_data->enst_spect[spec_indx] += 2.0 * const_fac * norm_fac * (cabs(w_hat_x * conj(w_hat_x)) + cabs(w_hat_y * conj(w_hat_y)) + cabs(w_hat_z * conj(w_hat_z)));;
+				}
+			}
+		}
+	}
+}
+/**
+ * Function used to compute the Energy spectrum of the current iteration. The energy spectrum is defined as all(sum) of the energy contained in concentric spherical shells in
+ * wavenumber space. 	
+ */
+void EnergySpectrum(void) {
+
+	// Initialize variables
+	int tmp1, tmp2;
+	int indx;
+	int spec_indx;
+	ptrdiff_t local_Nx 		  = sys_vars->local_Nx;
+	const long int Nx         = sys_vars->N[0];
+	const long int Ny         = sys_vars->N[1];
+	const long int Nz         = sys_vars->N[2];
+	const long int Nz_Fourier = sys_vars->N[2] / 2 + 1;
+	double norm_fac = 0.5 / pow(Nx * Ny * Nz, 2.0);
+    double const_fac = 8.0 * pow(M_PI, 3.0);
+    fftw_complex u_hat_x, u_hat_y, u_hat_z;
+
+	// ------------------------------------
+	// Initialize Spectrum Array
+	// ------------------------------------
+	for (int i = 0; i < sys_vars->n_spect; ++i) {
+		run_data->enrg_spect[i] = 0.0;
+	}
+
+	// ------------------------------------
+	// Compute Spectrum
+	// ------------------------------------
+	for (int i = 0; i < local_Nx; ++i) {
+		tmp1 = i * Ny;
+		for (int j = 0; j < Ny; ++j) {
+			tmp2 = Nz_Fourier * (tmp1 + j);
+			for (int k = 0; k < Nz_Fourier; ++k) {
+				indx = tmp2 + k;
+
+				// Get spectrum index -> spectrum is computed by summing over the energy contained in concentric annuli in wavenumber space
+				spec_indx = (int) round( sqrt( (double)(run_data->k[0][i] * run_data->k[0][i] + run_data->k[1][j] * run_data->k[1][j] + run_data->k[2][k] * run_data->k[2][k])));
+
+				// Get the current velocity components
+				u_hat_x = run_data->u_hat[SYS_DIM * indx + 0];
+				u_hat_y = run_data->u_hat[SYS_DIM * indx + 1];
+				u_hat_z = run_data->u_hat[SYS_DIM * indx + 2];
+				
+				// Update the current bin with this mode
+				if ((k == 0) || (k == Nz_Fourier - 1)) { // These modes do not have conjugates so are counted once
+					run_data->enrg_spect[spec_indx] += const_fac * norm_fac * (cabs(u_hat_x * conj(u_hat_x)) + cabs(u_hat_y * conj(u_hat_y)) + cabs(u_hat_z * conj(u_hat_z)));
+				}
+				else { // These modes have conjugates so are counted twice
+					run_data->enrg_spect[spec_indx] += 2.0 * const_fac * norm_fac * (cabs(u_hat_x * conj(u_hat_x)) + cabs(u_hat_y * conj(u_hat_y)) + cabs(u_hat_z * conj(u_hat_z)));
+				}
+			}
+		}
+	}
+}
+/**
+ * Function to compute the system measurables such as energy, enstrophy, palinstrophy, helicity, energy and enstrophy dissipation rates, and spectra at once on the local processes for the current timestep
+ * @param iter The index in the system arrays for the current timestep
+ */
+void ComputeSystemMeasurables(int iter) {
 
 	// Initialize variables
 	int tmp1, tmp2;
@@ -946,12 +1057,38 @@ void ComputeSystemTotals(int iter) {
 	const long int Ny         = sys_vars->N[1];
 	const long int Nz         = sys_vars->N[2];
 	const long int Nz_Fourier = sys_vars->N[2] / 2 + 1;
-	double norm_fac = 0.5 / pow(Nx * Ny * Nz, 2.0);
+	double k_sqr, pre_fac;
+	double norm_fac  = 0.5 / pow(Nx * Ny * Nz, 2.0);
+    double const_fac = 8.0 * pow(M_PI, 3.0);
 	fftw_complex w_hat_x, w_hat_y, w_hat_z;
+	fftw_complex u_hat_x, u_hat_y, u_hat_z;
 	fftw_complex curl_hat_x, curl_hat_y, curl_hat_z;
 
 	// ------------------------------------
-	// Compute Totals in Fourier Space
+	// Initialize Measurables
+	// ------------------------------------
+	#if defined(__SYS_MEASURES)
+	// Initialize totals
+	run_data->tot_enstr[iter]  = 0.0;
+	run_data->tot_palin[iter]  = 0.0;
+	run_data->tot_heli[iter]   = 0.0;
+	run_data->tot_energy[iter] = 0.0;
+	run_data->enrg_diss[iter]  = 0.0;
+	#endif 
+	#if defined(__ENRG_SPECT) || defined(__ENST_SPECT)
+	// Initialize spectra
+	for (int i = 0; i < sys_vars->n_spect; ++i) {
+		#if defined(__ENRG_SPECT)
+		run_data->enrg_spect[i] = 0.0;
+		#endif
+		#if defined(__ENST_SPECT)
+		run_data->enst_spect[i] = 0.0;
+		#endif
+	}
+	#endif
+
+	// ------------------------------------
+	// Compute Measureables in Fourier Space
 	// ------------------------------------
 	for (int i = 0; i < local_Nx; ++i) {
 		tmp1 = i * Ny;
@@ -960,39 +1097,86 @@ void ComputeSystemTotals(int iter) {
 			for (int k = 0; k < Ny; ++k) {
 				indx = tmp2 + k;
 
-				// Compute the Fourier space vorticity
-				w_hat_x = I * (run_data->k[1][j] * run_data->u_hat[SYS_DIM * indx + 2] - run_data->k[2][k] * run_data->u_hat[SYS_DIM * indx + 1]);
-				w_hat_y = I * (run_data->k[2][k] * run_data->u_hat[SYS_DIM * indx + 0] - run_data->k[0][i] * run_data->u_hat[SYS_DIM * indx + 2]);
-				w_hat_z = I * (run_data->k[0][i] * run_data->u_hat[SYS_DIM * indx + 1] - run_data->k[1][j] * run_data->u_hat[SYS_DIM * indx + 0]);
+				// Get the current velocity components
+				u_hat_x = run_data->u_hat[SYS_DIM * indx + 0];
+				u_hat_y = run_data->u_hat[SYS_DIM * indx + 1];
+				u_hat_z = run_data->u_hat[SYS_DIM * indx + 2];
 
+				// Compute the Fourier space vorticity
+				w_hat_x = I * (run_data->k[1][j] * u_hat_z - run_data->k[2][k] * u_hat_y);
+				w_hat_y = I * (run_data->k[2][k] * u_hat_x - run_data->k[0][i] * u_hat_z);
+				w_hat_z = I * (run_data->k[0][i] * u_hat_y - run_data->k[1][j] * u_hat_x);
+
+				///------------------------------------------ System Totals
+				#if defined(__SYS_MEASURES)
 				// Take the curl of the Fourier space vorticity
 				curl_hat_x = I * (run_data->k[1][j] * w_hat_z - run_data->k[2][k] * w_hat_y);
 				curl_hat_y = I * (run_data->k[2][k] * w_hat_x - run_data->k[0][i] * w_hat_z);
 				curl_hat_z = I * (run_data->k[0][i] * w_hat_y - run_data->k[1][j] * w_hat_x);
 
-				if ((k == 0) || (k == Nz_Fourier - 1)) {
-					// Update the sum for the totals
+				// Compute |k|^2
+				k_sqr = (double) (run_data->k[0][i] * run_data->k[0][i] + run_data->k[1][j] * run_data->k[1][j] + run_data->k[2][k] * run_data->k[2][k]);
+
+				// Determine the prefactor for the dissipation rate
+				#if defined(HYPER_VISC) 
+				// Hyperviscosity 
+				pre_fac = sys_vars->NU * pow(k_sqr, VIS_POW); 
+				#else 
+				// No hyper viscosity -> just normal viscosity
+				pre_fac = sys_vars->NU * k_sqr; 
+				#endif
+
+				// Update the sum for the totals
+				if ((k == 0) || (k == Nz_Fourier - 1)) { // these modes do not have conjugates so counted once
+					run_data->enrg_diss[iter]  += pre_fac * (cabs(u_hat_x * conj(u_hat_x)) + cabs(u_hat_y * conj(u_hat_y)) + cabs(u_hat_z * conj(u_hat_z)));
 					run_data->tot_enstr[iter]  += cabs(w_hat_x * conj(w_hat_x)) + cabs(w_hat_y * conj(w_hat_y)) + cabs(w_hat_z * conj(w_hat_z));
 					run_data->tot_palin[iter]  += cabs(curl_hat_x * conj(curl_hat_x)) + cabs(curl_hat_y * conj(curl_hat_y)) + cabs(curl_hat_z * conj(curl_hat_z));
-					run_data->tot_heli[iter]   += run_data->u_hat[SYS_DIM * indx + 0] * w_hat_x + run_data->u_hat[SYS_DIM * indx + 1] * w_hat_y + run_data->u_hat[SYS_DIM * indx + 2] * w_hat_z;
-					run_data->tot_energy[iter] += cabs(run_data->u_hat[SYS_DIM * indx + 0] * conj(run_data->u_hat[SYS_DIM * indx + 0])) + cabs(run_data->u_hat[SYS_DIM * indx + 1] * conj(run_data->u_hat[SYS_DIM * indx + 1])) + cabs(run_data->u_hat[SYS_DIM * indx + 2] * conj(run_data->u_hat[SYS_DIM * indx + 2]));
+					run_data->tot_heli[iter]   += u_hat_x * w_hat_x + u_hat_y * w_hat_y + u_hat_z * w_hat_z;
+					run_data->tot_energy[iter] += cabs(u_hat_x * conj(u_hat_x)) + cabs(u_hat_y * conj(u_hat_y)) + cabs(u_hat_z * conj(u_hat_z));
 				}
-				else {
-					// Update the sum for the totals
+				else { // these modes have conjugates, so counted twice
+					run_data->enrg_diss[iter]  += 2.0 * pre_fac * (cabs(u_hat_x * conj(u_hat_x)) + cabs(u_hat_y * conj(u_hat_y)) + cabs(u_hat_z * conj(u_hat_z)));
 					run_data->tot_enstr[iter]  += 2.0 * cabs(w_hat_x * conj(w_hat_x)) + cabs(w_hat_y * conj(w_hat_y)) + cabs(w_hat_z * conj(w_hat_z));
 					run_data->tot_palin[iter]  += 2.0 * cabs(curl_hat_x * conj(curl_hat_x)) + cabs(curl_hat_y * conj(curl_hat_y)) + cabs(curl_hat_z * conj(curl_hat_z));
-					run_data->tot_heli[iter]   += 2.0 * run_data->u_hat[SYS_DIM * indx + 0] * w_hat_x + run_data->u_hat[SYS_DIM * indx + 1] * w_hat_y + run_data->u_hat[SYS_DIM * indx + 2] * w_hat_z;
-					run_data->tot_energy[iter] += 2.0 * cabs(run_data->u_hat[SYS_DIM * indx + 0] * conj(run_data->u_hat[SYS_DIM * indx + 0])) + cabs(run_data->u_hat[SYS_DIM * indx + 1] * conj(run_data->u_hat[SYS_DIM * indx + 1])) + cabs(run_data->u_hat[SYS_DIM * indx + 2] * conj(run_data->u_hat[SYS_DIM * indx + 2]));				
+					run_data->tot_heli[iter]   += 2.0 * u_hat_x * w_hat_x + u_hat_y * w_hat_y + u_hat_z * w_hat_z;
+					run_data->tot_energy[iter] += 2.0 * cabs(u_hat_x * conj(u_hat_x)) + cabs(u_hat_y * conj(u_hat_y)) + cabs(u_hat_z * conj(u_hat_z));				
 				}
+				#endif	
+
+				///------------------------------------------ System Spectra
+				#if defined(__ENRG_SPECT) || defined(__ENST_SPECT)
+				if ((k == 0) || (k == Nz_Fourier - 1)) { // these modes do not have conjugates so counted once
+					#if defined(__ENRG_SPECT)
+					run_data->enrg_spect[i] += const_fac * norm_fac * (cabs(u_hat_x * conj(u_hat_x)) + cabs(u_hat_y * conj(u_hat_y)) + cabs(u_hat_z * conj(u_hat_z)));
+					#endif
+					#if defined(__ENST_SPECT)
+					run_data->enst_spect[i] += const_fac * norm_fac * (cabs(w_hat_x * conj(w_hat_x)) + cabs(w_hat_y * conj(w_hat_y)) + cabs(w_hat_z * conj(w_hat_z)));;
+					#endif
+				}
+				else { // these modes have conjugates, so counted twice
+					#if defined(__ENRG_SPECT)
+					run_data->enrg_spect[i] += 2.0 * const_fac * norm_fac * (cabs(u_hat_x * conj(u_hat_x)) + cabs(u_hat_y * conj(u_hat_y)) + cabs(u_hat_z * conj(u_hat_z)));
+					#endif
+					#if defined(__ENST_SPECT)
+					run_data->enst_spect[i] += 2.0 * const_fac * norm_fac * (cabs(w_hat_x * conj(w_hat_x)) + cabs(w_hat_y * conj(w_hat_y)) + cabs(w_hat_z * conj(w_hat_z)));;
+					#endif
+				}
+				#endif	
 			}
 		}
 	}
 	
+	// ------------------------------------
+	// Normalize Measureables 
+	// ------------------------------------	
+	#if defined(__SYS_MEASURES)
 	// Normalize results and take into account computation in Fourier space
-	run_data->tot_enstr[iter]  *= 8.0 * pow(M_PI, 3.0) * norm_fac;
-	run_data->tot_palin[iter]  *= 8.0 * pow(M_PI, 3.0) * norm_fac;
-	run_data->tot_heli[iter]   *= 8.0 * pow(M_PI, 3.0) * norm_fac;
-	run_data->tot_energy[iter] *= 8.0 * pow(M_PI, 3.0) * norm_fac;
+	run_data->enrg_diss[iter]  *= 2.0 * const_fac * norm_fac;
+	run_data->tot_enstr[iter]  *= const_fac * norm_fac;
+	run_data->tot_palin[iter]  *= const_fac * norm_fac;
+	run_data->tot_heli[iter]   *= const_fac * norm_fac;
+	run_data->tot_energy[iter] *= const_fac * norm_fac;
+	#endif
 }
 /**
  * Function to record the system measures for the current timestep 
@@ -1004,7 +1188,7 @@ void RecordSystemMeasures(double t, int print_indx, RK_data_struct* RK_data) {
 
 	// -------------------------------
 	// Record the System Measures 
-	// -------------------------------
+	// -------------------------------	
 	// The integration time
 	#if defined(__TIME)
 	if (!(sys_vars->rank)) {
@@ -1014,41 +1198,14 @@ void RecordSystemMeasures(double t, int print_indx, RK_data_struct* RK_data) {
 
 	// Check if within memory limits
 	if (print_indx < sys_vars->num_print_steps) {
-		#if defined(__SYS_MEASURES)
-		// System totals: energy, enstrophy, palinstrophy, helicity
-		ComputeSystemTotals(print_indx);
-		// // Energy and enstrophy dissipation rates
-		// run_data->enrg_diss[print_indx] = EnergyDissipationRate();
-		// run_data->enst_diss[print_indx] = EnstrophyDissipationRate();
-		#endif
-		#if defined(__ENST_FLUX)
-		// Enstrophy and energy flux in/out and dissipation of a subset of modes
-		// EnstrophyFlux(&(run_data->enst_flux_sbst[print_indx]), &(run_data->enst_diss_sbst[print_indx]), RK_data);
-		#endif
-		#if defined(__ENRG_FLUX)
-		// EnergyFlux(&(run_data->enrg_flux_sbst[print_indx]), &(run_data->enrg_diss_sbst[print_indx]), RK_data);
+		#if defined(__SYS_MEASURES) || defined(__ENRG_SPECT) || defined(__ENST_SPECT)
+		// System totals: energy, enstrophy, palinstrophy, helicity, energy and enstrophy dissipation rates and spectra
+		ComputeSystemMeasurables(print_indx);
 		#endif
 	}
 	else {
 		printf("\n["MAGENTA"WARNING"RESET"] --- Unable to write system measures at Indx: [%d] t: [%lf] ---- Number of intergration steps is now greater then memory allocated\n", print_indx, t);
 	}
-	
-	// // -------------------------------
-	// // Record the Spectra 
-	// // -------------------------------
-	// // Call spectra functions
-	// #if defined(__ENST_SPECT )
-	// EnstrophySpectrum();
-	// #endif
-	// #if defined(__ENRG_SPECT)
-	// EnergySpectrum();
-	// #endif
-	// #if defined(__ENRG_FLUX_SPECT)
-	// EnergyFluxSpectrum(RK_data);
-	// #endif
-	// #if defined(__ENST_FLUX_SPECT)
-	// EnstrophyFluxSpectrum(RK_data);
-	// #endif
 }
 /**
  * Function to initialize all the integration time variables
@@ -1170,15 +1327,8 @@ void InitializeSystemMeasurables(RK_data_struct* RK_data) {
 		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for the ["CYAN"%s"RESET"]\n-->> Exiting!!!\n", "Energy Dissipation Rate");
 		exit(1);
 	}	
-
-	// Enstrophy Dissipation Rate
-	run_data->enst_diss = (double* )fftw_malloc(sizeof(double) * print_steps);
-	if (run_data->enst_diss == NULL) {
-		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for the ["CYAN"%s"RESET"]\n-->> Exiting!!!\n", "Enstrophy Dissipation Rate");
-		exit(1);
-	}	
 	#endif
-	#if defined(__ENST_SPECT )
+	#if defined(__ENST_SPECT)
 	// Enstrophy Spectrum
 	run_data->enst_spect = (double* )fftw_malloc(sizeof(double) * n_spect);
 	if (run_data->enst_spect == NULL) {
@@ -1186,7 +1336,7 @@ void InitializeSystemMeasurables(RK_data_struct* RK_data) {
 		exit(1);
 	}	
 	#endif
-	#if defined(__ENRG_SPECT )
+	#if defined(__ENRG_SPECT)
 	// Energy Spectrum
 	run_data->enrg_spect = (double* )fftw_malloc(sizeof(double) * n_spect);
 	if (run_data->enrg_spect == NULL) {
@@ -1234,7 +1384,7 @@ void InitializeSystemMeasurables(RK_data_struct* RK_data) {
 		}	
 	}
 	#endif
-	#if defined(__ENST_FLUX_SPECT )
+	#if defined(__ENST_FLUX_SPECT)
 	// Enstrophy Spectrum
 	run_data->enst_flux_spect = (double* )fftw_malloc(sizeof(double) * n_spect);
 	if (run_data->enst_flux_spect == NULL) {
@@ -1242,7 +1392,7 @@ void InitializeSystemMeasurables(RK_data_struct* RK_data) {
 		exit(1);
 	}	
 	#endif
-	#if defined(__ENRG_FLUX_SPECT )
+	#if defined(__ENRG_FLUX_SPECT)
 	// Energy Spectrum
 	run_data->enrg_flux_spect = (double* )fftw_malloc(sizeof(double) * n_spect);
 	if (run_data->enrg_flux_spect == NULL) {
@@ -1254,15 +1404,14 @@ void InitializeSystemMeasurables(RK_data_struct* RK_data) {
 	// ----------------------------
 	// Get Measurables of the ICs
 	// ----------------------------
-	#if defined(__SYS_MEASURES)
+	#if defined(__SYS_MEASURES) || defined(__ENST_SPECT) || defined(__ENRG_SPECT)
 	// Compute system quantities
-	ComputeSystemTotals(0);
-
-	// // Energy dissipation rate
-	// run_data->enrg_diss[0] = EnergyDissipationRate();
-
-	// // Enstrophy dissipation rate
-	// run_data->enst_diss[0] = EnstrophyDissipationRate();
+	ComputeSystemMeasurables(0);
+	#endif
+	#if defined(__TIME)
+	if (!(sys_vars->rank)) {
+		run_data->time[0] = sys_vars->t0;
+	}
 	#endif
 	// #if defined(__ENST_FLUX)
 	// // Enstrophy Flux and dissipation from/to Subset of modes
@@ -1272,23 +1421,11 @@ void InitializeSystemMeasurables(RK_data_struct* RK_data) {
 	// // Energy Flux and dissipation from/to a subset of modes
 	// EnergyFlux(&(run_data->enrg_flux_sbst[0]), &(run_data->enrg_diss_sbst[0]), RK_data);
 	// #endif
-	// // Time
-	// #if defined(__TIME)
-	// if (!(sys_vars->rank)) {
-	// 	run_data->time[0] = sys_vars->t0;
-	// }
-	// #endif
+	// Time
 
 	// // ----------------------------
 	// // Get Spectra of the ICs
 	// // ----------------------------
-	// // Call spectra functions
-	// #if defined(__ENST_SPECT)
-	// EnstrophySpectrum();
-	// #endif
-	// #if defined(__ENRG_SPECT)
-	// EnergySpectrum();
-	// #endif
 	// #if defined(__ENRG_FLUX_SPECT)
 	// EnergyFluxSpectrum(RK_data);
 	// #endif
@@ -1777,7 +1914,6 @@ void FreeMemory(RK_data_struct* RK_data) {
 	fftw_free(run_data->tot_palin);
 	fftw_free(run_data->tot_heli);
 	fftw_free(run_data->enrg_diss);
-	fftw_free(run_data->enst_diss);
 	#endif
 	#if defined(__ENST_FLUX)
 	fftw_free(run_data->enst_flux_sbst);
