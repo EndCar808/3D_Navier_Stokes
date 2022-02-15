@@ -107,9 +107,9 @@ void SpectralSolve(void) {
 	// -------------------------------------------------
 	// Print IC to Screen 
 	// -------------------------------------------------
-	// #if defined(__PRINT_SCREEN)
-	// PrintUpdateToTerminal(0, t0, dt, T, 0);
-	// #endif
+	#if defined(__PRINT_SCREEN)
+	PrintUpdateToTerminal(0, t0, dt, T, 0);
+	#endif
 
 
 	//////////////////////////////
@@ -157,10 +157,6 @@ void SpectralSolve(void) {
 		// Write To File
 		// -------------------------------
 		if ((iters > trans_steps) && (iters % sys_vars->SAVE_EVERY == 0)) {
-			#if defined(TESTING)
-			TaylorGreenSoln(t, N);
-			#endif
-
 			// Record System Measurables
 			RecordSystemMeasures(t, save_data_indx, RK_data);
 
@@ -181,10 +177,10 @@ void SpectralSolve(void) {
 		}
 		#endif
 		if (iters % sys_vars->SAVE_EVERY == 0) {
-			// PrintUpdateToTerminal(iters, t, dt, T, save_data_indx - 1);
-			if (!sys_vars->rank) printf("Iter: %ld\t dt: %1.16lf\tt: %lf\n", iters, dt, t);
+			PrintUpdateToTerminal(iters, t, dt, T, save_data_indx - 1);
 		}
 		#endif
+
 		// -------------------------------
 		// Update & System Check
 		// -------------------------------
@@ -195,7 +191,11 @@ void SpectralSolve(void) {
 	//////////////////////////////
 	// End Integration
 	//////////////////////////////
-	
+
+	// ------------------------------- 
+	// Final Writes to Output File
+	// -------------------------------
+	FinalWriteAndCloseOutputFile(N, iters, save_data_indx);
 
 	// -------------------------------
 	// Clean Up 
@@ -726,6 +726,85 @@ void NonlinearRHSBatch(fftw_complex* u_hat, fftw_complex* dw_hat_dt, double* cur
  	// ApplyForcing(dw_hat_dt, sys_vars->N);
 }
 /**
+ * Function to compute the maximum velocity norm
+ * @return  The max
+ */
+double GetMaxData(void) {
+
+	// Initialize variables
+	double max = 0.0;
+	int tmp1, tmp2, indx;
+	ptrdiff_t local_Nx        = sys_vars->local_Nx;
+	const long int Ny         = sys_vars->N[1];
+	const long int Nz_Fourier = sys_vars->N[2] / 2 + 1;	
+
+	for (int i = 0; i < local_Nx; ++i) {
+		tmp1 = i * Ny;
+		for (int j = 0; j < Ny; ++j) {
+			tmp2 = Nz_Fourier * (tmp1 + j);
+			for (int k = 0; k < Nz_Fourier; ++k) {
+				indx = tmp2 + k;
+				for (int d = 0; d < SYS_DIM; ++d) {
+					if (fabs(run_data->u[SYS_DIM * indx + d]) > max) {
+						max = fabs(run_data->u[SYS_DIM * indx + d]);
+					}
+					else {
+						continue;
+					}
+				}				
+			}
+		}
+	}
+
+	return max;
+}
+/**
+ * Used to print update to screen
+ * @param iters          The current iteration of the integration
+ * @param t              The current time in the simulation
+ * @param dt             The current timestep in the simulation
+ * @param T              The final time of the simulation
+ * @param save_data_indx The saving index for output data
+ * @param RK_data        Struct containing arrays for the Runge-Kutta integration
+ */
+void PrintUpdateToTerminal(int iters, double t, double dt, double T, int save_data_indx) {
+
+	// Initialize variables
+	double max_vel;
+
+	// #if defined(TESTING)
+	// // Initialize norms array
+	// double norms[2];
+	
+	// // Get max vorticity
+	// max_vort = GetMaxData("VORT");
+
+	// if(!(strcmp(sys_vars->u0, "TG_VEL")) || !(strcmp(sys_vars->u0, "TG_VORT"))) {
+	// 	// Get Taylor Green Solution
+	// 	TestTaylorGreenVortex(t, sys_vars->N, norms);
+
+	// 	// Print Update to screen
+	// 	if( !(sys_vars->rank) ) {	
+	// 		printf("Iter: %d\tt: %1.6lf/%1.3lf\tdt: %g\t Max Vort: %1.4lf\tKE: %1.5lf\tENS: %1.5lf\tPAL: %1.5lf\tL2: %g\tLinf: %g\n", iters, t, dt, T, max_vort, run_data->tot_energy[save_data_indx], run_data->tot_enstr[save_data_indx], run_data->tot_palin[save_data_indx], norms[0], norms[1]);
+	// 	}
+	// }
+	// else {
+	// 	// Print Update to screen
+	// 	if( !(sys_vars->rank) ) {	
+	// 		printf("Iter: %d\tt: %1.6lf/%1.3lf\tdt: %g\t Max Vort: %1.4lf\tTKE: %1.8lf\tENS: %1.8lf\tPAL: %g\tE_Diss: %g\tEns_Diss: %g\n", iters, t, T, dt, max_vort, run_data->tot_energy[save_data_indx], run_data->tot_enstr[save_data_indx], run_data->tot_palin[save_data_indx], run_data->enrg_diss[save_data_indx], run_data->enst_diss[save_data_indx]);
+	// 	}
+	// }
+	// #else
+	// Get max vorticity
+	max_vel = GetMaxData();
+
+	// Print to screen
+	if( !(sys_vars->rank) ) {	
+		printf("Iter: %d/%ld\tt: %1.6lf/%1.3lf\tdt: %g\tMax Vel: %g\tKE: %g\tENS: %g\tPAL: %g\tHEL: %g\tDISS: %g\n", iters, sys_vars->num_t_steps, t, T, dt, max_vel, run_data->tot_energy[save_data_indx], run_data->tot_enstr[save_data_indx], run_data->tot_palin[save_data_indx], run_data->tot_heli[save_data_indx], run_data->enrg_diss[save_data_indx]);
+	}
+	// #endif	
+}
+/**
  * Function to compute the total energy in the system at the current timestep
  * @return  The total energy in the system
  */
@@ -1131,14 +1210,14 @@ void ComputeSystemMeasurables(int iter) {
 					run_data->enrg_diss[iter]  += pre_fac * (cabs(u_hat_x * conj(u_hat_x)) + cabs(u_hat_y * conj(u_hat_y)) + cabs(u_hat_z * conj(u_hat_z)));
 					run_data->tot_enstr[iter]  += cabs(w_hat_x * conj(w_hat_x)) + cabs(w_hat_y * conj(w_hat_y)) + cabs(w_hat_z * conj(w_hat_z));
 					run_data->tot_palin[iter]  += cabs(curl_hat_x * conj(curl_hat_x)) + cabs(curl_hat_y * conj(curl_hat_y)) + cabs(curl_hat_z * conj(curl_hat_z));
-					run_data->tot_heli[iter]   += u_hat_x * w_hat_x + u_hat_y * w_hat_y + u_hat_z * w_hat_z;
+					run_data->tot_heli[iter]   += creal(u_hat_x * w_hat_x + u_hat_y * w_hat_y + u_hat_z * w_hat_z);
 					run_data->tot_energy[iter] += cabs(u_hat_x * conj(u_hat_x)) + cabs(u_hat_y * conj(u_hat_y)) + cabs(u_hat_z * conj(u_hat_z));
 				}
 				else { // these modes have conjugates, so counted twice
 					run_data->enrg_diss[iter]  += 2.0 * pre_fac * (cabs(u_hat_x * conj(u_hat_x)) + cabs(u_hat_y * conj(u_hat_y)) + cabs(u_hat_z * conj(u_hat_z)));
 					run_data->tot_enstr[iter]  += 2.0 * cabs(w_hat_x * conj(w_hat_x)) + cabs(w_hat_y * conj(w_hat_y)) + cabs(w_hat_z * conj(w_hat_z));
 					run_data->tot_palin[iter]  += 2.0 * cabs(curl_hat_x * conj(curl_hat_x)) + cabs(curl_hat_y * conj(curl_hat_y)) + cabs(curl_hat_z * conj(curl_hat_z));
-					run_data->tot_heli[iter]   += 2.0 * u_hat_x * w_hat_x + u_hat_y * w_hat_y + u_hat_z * w_hat_z;
+					run_data->tot_heli[iter]   += 2.0 * creal(u_hat_x * w_hat_x + u_hat_y * w_hat_y + u_hat_z * w_hat_z);
 					run_data->tot_energy[iter] += 2.0 * cabs(u_hat_x * conj(u_hat_x)) + cabs(u_hat_y * conj(u_hat_y)) + cabs(u_hat_z * conj(u_hat_z));				
 				}
 				#endif	
