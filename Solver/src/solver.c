@@ -94,13 +94,13 @@ void SpectralSolve(void) {
 
 	// Get timestep and other integration variables
 	InitializeIntegrationVariables(&t0, &t, &dt, &T, &trans_steps);
-	
+
 	// -------------------------------
 	// Create & Open Output File
 	// -------------------------------
 	// Inialize system measurables
 	InitializeSystemMeasurables(RK_data);
-	   
+
 	// Create and open the output file - also write initial conditions to file
 	CreateOutputFilesWriteICs(N, dt);
 
@@ -828,7 +828,7 @@ double TotalEnergy(void) {
 		tmp1 = i * Ny;
 		for (int j = 0; j < Ny; ++j) {
 			tmp2 = Nz_Fourier * (tmp1 + j);
-			for (int k = 0; k < Ny; ++k) {
+			for (int k = 0; k < Nz_Fourier; ++k) {
 				indx = tmp2 + k;
 
 				if ((k == 0) || (k == Nz_Fourier - 1)) {
@@ -875,7 +875,7 @@ double TotalEnstrophy(void) {
 		tmp1 = i * Ny;
 		for (int j = 0; j < Ny; ++j) {
 			tmp2 = Nz_Fourier * (tmp1 + j);
-			for (int k = 0; k < Ny; ++k) {
+			for (int k = 0; k < Nz_Fourier; ++k) {
 				indx = tmp2 + k;
 
 				// Compute the Fourier space vorticity
@@ -927,7 +927,7 @@ double TotalHelicity(void) {
 		tmp1 = i * Ny;
 		for (int j = 0; j < Ny; ++j) {
 			tmp2 = Nz_Fourier * (tmp1 + j);
-			for (int k = 0; k < Ny; ++k) {
+			for (int k = 0; k < Nz_Fourier; ++k) {
 				indx = tmp2 + k;
 
 				// Compute the Fourier space vorticity
@@ -980,7 +980,7 @@ double TotalPalinstrophy(void) {
 		tmp1 = i * Ny;
 		for (int j = 0; j < Ny; ++j) {
 			tmp2 = Nz_Fourier * (tmp1 + j);
-			for (int k = 0; k < Ny; ++k) {
+			for (int k = 0; k < Nz_Fourier; ++k) {
 				indx = tmp2 + k;
 
 				// Compute the Fourier space vorticity
@@ -1131,6 +1131,7 @@ void ComputeSystemMeasurables(int iter) {
 	// Initialize variables
 	int tmp1, tmp2;
 	int indx;
+	int spec_indx;
 	ptrdiff_t local_Nx 		  = sys_vars->local_Nx;
 	const long int Nx         = sys_vars->N[0];
 	const long int Ny         = sys_vars->N[1];
@@ -1173,7 +1174,7 @@ void ComputeSystemMeasurables(int iter) {
 		tmp1 = i * Ny;
 		for (int j = 0; j < Ny; ++j) {
 			tmp2 = Nz_Fourier * (tmp1 + j);
-			for (int k = 0; k < Ny; ++k) {
+			for (int k = 0; k < Nz_Fourier; ++k) {
 				indx = tmp2 + k;
 
 				// Get the current velocity components
@@ -1224,20 +1225,23 @@ void ComputeSystemMeasurables(int iter) {
 
 				///------------------------------------------ System Spectra
 				#if defined(__ENRG_SPECT) || defined(__ENST_SPECT)
+				// Get spectrum index -> spectrum is computed by summing over the energy contained in concentric annuli in wavenumber space
+				spec_indx = (int) round( sqrt( (double)(run_data->k[0][i] * run_data->k[0][i] + run_data->k[1][j] * run_data->k[1][j] + run_data->k[2][k] * run_data->k[2][k])));
+
 				if ((k == 0) || (k == Nz_Fourier - 1)) { // these modes do not have conjugates so counted once
 					#if defined(__ENRG_SPECT)
-					run_data->enrg_spect[i] += const_fac * norm_fac * (cabs(u_hat_x * conj(u_hat_x)) + cabs(u_hat_y * conj(u_hat_y)) + cabs(u_hat_z * conj(u_hat_z)));
+					run_data->enrg_spect[spec_indx] += const_fac * norm_fac * (cabs(u_hat_x * conj(u_hat_x)) + cabs(u_hat_y * conj(u_hat_y)) + cabs(u_hat_z * conj(u_hat_z)));
 					#endif
 					#if defined(__ENST_SPECT)
-					run_data->enst_spect[i] += const_fac * norm_fac * (cabs(w_hat_x * conj(w_hat_x)) + cabs(w_hat_y * conj(w_hat_y)) + cabs(w_hat_z * conj(w_hat_z)));;
+					run_data->enst_spect[spec_indx] += const_fac * norm_fac * (cabs(w_hat_x * conj(w_hat_x)) + cabs(w_hat_y * conj(w_hat_y)) + cabs(w_hat_z * conj(w_hat_z)));;
 					#endif
 				}
 				else { // these modes have conjugates, so counted twice
 					#if defined(__ENRG_SPECT)
-					run_data->enrg_spect[i] += 2.0 * const_fac * norm_fac * (cabs(u_hat_x * conj(u_hat_x)) + cabs(u_hat_y * conj(u_hat_y)) + cabs(u_hat_z * conj(u_hat_z)));
+					run_data->enrg_spect[spec_indx] += 2.0 * const_fac * norm_fac * (cabs(u_hat_x * conj(u_hat_x)) + cabs(u_hat_y * conj(u_hat_y)) + cabs(u_hat_z * conj(u_hat_z)));
 					#endif
 					#if defined(__ENST_SPECT)
-					run_data->enst_spect[i] += 2.0 * const_fac * norm_fac * (cabs(w_hat_x * conj(w_hat_x)) + cabs(w_hat_y * conj(w_hat_y)) + cabs(w_hat_z * conj(w_hat_z)));;
+					run_data->enst_spect[spec_indx] += 2.0 * const_fac * norm_fac * (cabs(w_hat_x * conj(w_hat_x)) + cabs(w_hat_y * conj(w_hat_y)) + cabs(w_hat_z * conj(w_hat_z)));;
 					#endif
 				}
 				#endif	
@@ -1479,7 +1483,6 @@ void InitializeSystemMeasurables(RK_data_struct* RK_data) {
 		exit(1);
 	}	
 	#endif
-
 	// ----------------------------
 	// Get Measurables of the ICs
 	// ----------------------------
