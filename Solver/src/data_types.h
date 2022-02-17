@@ -136,6 +136,7 @@
 #define MAX_VORT_LIM 1e+100     // The maximum allowed vorticity
 // Initial Condition Parameters
 #define KAPPA 1.0               // The wavenumber for the Taylor Green vortex intial condition
+#define A 2.0 					// The amplitude of the Shapiro initial condition
 #define K 2.0 					// The wavenumber in the x direction for the Shapiro initial condition
 #define L 2.0 					// The wavenumber in the y direction for the Shapiro initial condition
 #define M 2.0 					// The wavenumber in the z direction for the Shapiro initial condition
@@ -211,7 +212,8 @@ typedef struct runtime_data_struct {
 	double* enst_spect;       // Array to hold the enstrophy spectrum of the system
 	double* enst_flux_spect;  // Array to hold the enstrophy flux of the system
 	double* enrg_flux_spect;  // Array to hold the energy flux spectrum
-	double* tg_soln;	  	  // Array for computing the Taylor Green vortex solution
+	double* exact_soln;	  	  // Array for computing the Shapiro solution
+	double err_norms[2];  	  // Array for holding the Linf aand L2 norms for the Shapiro solution
 } runtime_data_struct;
 
 // Runge-Kutta Integration struct

@@ -44,7 +44,7 @@ int GetCMLArgs(int argc, char** argv) {
     // Input file path
     strncpy(file_info->input_file_name, "NONE", 512);
     // Output file directory
-    strncpy(file_info->output_dir, "../Data/Tmp/", 512);  // Set default output directory to the Tmp folder
+    strncpy(file_info->output_dir, "./Data/Tmp/", 512);  // Set default output directory to the Tmp folder
     strncpy(file_info->output_tag, "NO_TAG", 64);
     file_info->file_only = 0; // used to indicate if output file should be file only i.e., not output folder
     // System dimensions
@@ -162,6 +162,11 @@ int GetCMLArgs(int argc, char** argv) {
                 if (!(strcmp(optarg,"TAYLOR_GREEN"))) {
                     // The Taylor Green vortex - starting with the velocity
                     strncpy(sys_vars->u0, "TAYLOR_GREEN", 64);
+                    break;
+                }
+                if (!(strcmp(optarg,"SHAPIRO"))) {
+                    // The Taylor Green vortex - starting with the velocity
+                    strncpy(sys_vars->u0, "SHAPIRO", 64);
                     break;
                 }
                 else if (!(strcmp(optarg,"TESTING"))) {

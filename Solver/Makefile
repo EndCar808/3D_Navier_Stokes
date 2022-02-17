@@ -52,7 +52,7 @@ PHASE_ONLY := -D__NAVIER -D__HYPER -D__PHASE_ONLY -D__TRANSIENTS
 DSET_FLAGS := -D__SYS_MEASURES -D__ENST_FLUX -D__ENRG_FLUX -D__ENST_SPECT -D__ENRG_SPECT -D__ENST_FLUX_SPECT -D__ENRG_FLUX_SPECT -D__VORT_REAL -D__REALSPACE -D__MODES  
  
 # Flags to be passed to the solver for testing
-TG_TEST_FLAGS    := -D__NAVIER -D__TESTING -D__DEBUG #-D__ADAPTIVE_STEP -D__CFL_STEP -D__TRANSIENTS
+TEST_FLAGS    := -D__NAVIER -D__TESTING -D__DEBUG #-D__ADAPTIVE_STEP -D__CFL_STEP -D__TRANSIENTS
 # ---------------------------------------------------------------------
 #  Directory creation
 # ---------------------------------------------------------------------
@@ -69,7 +69,7 @@ SRCDIR     := src
 SRCFILE    := $(wildcard $(SRCDIR)/*.c)
 SRCOBJ     := $(patsubst $(SRCDIR)/%.c, $(OBJBIN)/%.o, $(SRCFILE))
 SRCOBJ_PO  := $(patsubst $(SRCDIR)/%.c, $(OBJBIN)/%_phase_only.o, $(SRCFILE))
-SRCOBJ_TG  := $(patsubst $(SRCDIR)/%.c, $(OBJBIN)/%_TG_test.o, $(SRCFILE))
+SRCOBJ_TG  := $(patsubst $(SRCDIR)/%.c, $(OBJBIN)/%_test.o, $(SRCFILE))
 
 
 DEPS = $(wildcard *.h) 
@@ -82,7 +82,7 @@ DEPS = $(wildcard *.h)
 ############
 
 
-all: $(BIN)/solver $(BIN)/solver_phase_only $(BIN)/solver_TG_test 
+all: $(BIN)/solver $(BIN)/solver_phase_only $(BIN)/solver_test 
 
 
 ####--------
@@ -110,17 +110,17 @@ $(OBJBIN)/%_phase_only.o: $(SRCDIR)/%.c $(DEPS)
 ####--------
 #  Testing
 ####--------
-test: $(BIN)/solver_TG_test
+test: $(BIN)/solver_test
 
-test_run: $(BIN)/solver_TG_test $(BIN)/solver_DB_SL_test $(BIN)/solver_DT_test $(BIN)/solver_DT2_test
+test_run: $(BIN)/solver_test
 	mpirun -n 4 $(BIN)/solver_TG_test -o "../Data/Test/" -n 128 -n 128 -s 0.0 -e 1.0 -h 0.0001 -i "TG_VORT" -v 1.0 -t "TG-TEST"
 	
 # Taylor Green IC
-$(BIN)/solver_TG_test: $(SRCOBJ_TG) $(DEPS)
-	$(GCC) $(CCFLAG) $(TG_TEST_FLAGS) $(DSET_FLAGS) -o $@ $^ ${INCDIR} ${LIBDIR} $(LIBFLAG) $(GSLFLAG)
+$(BIN)/solver_test: $(SRCOBJ_TG) $(DEPS)
+	$(GCC) $(CCFLAG) $(TEST_FLAGS) $(DSET_FLAGS) -o $@ $^ ${INCDIR} ${LIBDIR} $(LIBFLAG) $(GSLFLAG)
 
-$(OBJBIN)/%_TG_test.o: $(SRCDIR)/%.c $(DEPS)
-	$(GCC) $(CCFLAG) $(TG_TEST_FLAGS) $(DSET_FLAGS) -c $^ -o $@ ${INCDIR} ${LIBDIR} $(LIBFLAG) $(GSLFLAG)
+$(OBJBIN)/%_test.o: $(SRCDIR)/%.c $(DEPS)
+	$(GCC) $(CCFLAG) $(TEST_FLAGS) $(DSET_FLAGS) -c $^ -o $@ ${INCDIR} ${LIBDIR} $(LIBFLAG) $(GSLFLAG)
 
 # ---------------------------------------------------------------------
 #  Clean up

@@ -108,7 +108,7 @@ void SpectralSolve(void) {
 	// Print IC to Screen 
 	// -------------------------------------------------
 	#if defined(__PRINT_SCREEN)
-	PrintUpdateToTerminal(0, t0, dt, T, 0);
+	PrintUpdateToTerminal(0, trans_steps, t0, dt, T, 0);
 	#endif
 
 
@@ -158,7 +158,7 @@ void SpectralSolve(void) {
 		// -------------------------------
 		if ((iters > trans_steps) && (iters % sys_vars->SAVE_EVERY == 0)) {
 			#if defined(TESTING)
-			ShapiroExactSolution(t);
+			ShapiroExactSolution(t, run_data->err_norms);
 			#endif
 
 			// Record System Measurables
@@ -181,7 +181,7 @@ void SpectralSolve(void) {
 		}
 		#endif
 		if (iters % sys_vars->SAVE_EVERY == 0) {
-			PrintUpdateToTerminal(iters, t, dt, T, save_data_indx - 1);
+			PrintUpdateToTerminal(iters, trans_steps, t, dt, T, save_data_indx - 1);
 		}
 		#endif
 
@@ -771,7 +771,7 @@ double GetMaxData(void) {
  * @param save_data_indx The saving index for output data
  * @param RK_data        Struct containing arrays for the Runge-Kutta integration
  */
-void PrintUpdateToTerminal(int iters, double t, double dt, double T, int save_data_indx) {
+void PrintUpdateToTerminal(long int iters, long int trans_steps, double t, double dt, double T, int save_data_indx) {
 
 	// Initialize variables
 	double max_vel;
@@ -803,8 +803,17 @@ void PrintUpdateToTerminal(int iters, double t, double dt, double T, int save_da
 	max_vel = GetMaxData();
 
 	// Print to screen
-	if( !(sys_vars->rank) ) {	
-		printf("Iter: %d/%ld\tt: %1.6lf/%1.3lf\tdt: %g\tMax Vel: %g\tKE: %g\tENS: %g\tPAL: %g\tHEL: %g\tDISS: %g\n", iters, sys_vars->num_t_steps, t, T, dt, max_vel, run_data->tot_energy[save_data_indx], run_data->tot_enstr[save_data_indx], run_data->tot_palin[save_data_indx], run_data->tot_heli[save_data_indx], run_data->enrg_diss[save_data_indx]);
+	if( !(sys_vars->rank) ) {
+		#if defined(TESTING)	
+		if (iters <= trans_steps) {
+			printf("Iter: %ld/%ld\tt: %1.6lf/%1.3lf\tdt: %g\tMax Vel: %g\tKE: %g\tENS: %g\tPAL: %g\tHEL: %g\tDISS: %g\n", iters, sys_vars->num_t_steps, t, T, dt, max_vel, run_data->tot_energy[save_data_indx], run_data->tot_enstr[save_data_indx], run_data->tot_palin[save_data_indx], run_data->tot_heli[save_data_indx], run_data->enrg_diss[save_data_indx]);
+		}
+		else {
+			printf("Iter: %ld/%ld\tt: %1.6lf/%1.3lf\tdt: %g\tMax Vel: %g\tKE: %g\tENS: %g\tPAL: %g\tHEL: %g\tDISS: %g\tL2: %g\tLinf: %g\n", iters, sys_vars->num_t_steps, t, T, dt, max_vel, run_data->tot_energy[save_data_indx], run_data->tot_enstr[save_data_indx], run_data->tot_palin[save_data_indx], run_data->tot_heli[save_data_indx], run_data->enrg_diss[save_data_indx], run_data->err_norms[0], run_data->err_norms[1]);			
+		}
+		#else
+		printf("Iter: %ld/%ld\tt: %1.6lf/%1.3lf\tdt: %g\tMax Vel: %g\tKE: %g\tENS: %g\tPAL: %g\tHEL: %g\tDISS: %g\n", iters, sys_vars->num_t_steps, t, T, dt, max_vel, run_data->tot_energy[save_data_indx], run_data->tot_enstr[save_data_indx], run_data->tot_palin[save_data_indx], run_data->tot_heli[save_data_indx], run_data->enrg_diss[save_data_indx]);
+		#endif
 	}
 	// #endif	
 }
@@ -1563,7 +1572,7 @@ void InitialConditions(fftw_complex* u_hat, double* u, const long int* N) {
     	// Transform velocities to Fourier space
     	fftw_mpi_execute_dft_r2c(sys_vars->fftw_3d_dft_batch_r2c, u, u_hat);
     }
-    if(!(strcmp(sys_vars->u0, "TAYLOR_GREEN"))) {
+    if(!(strcmp(sys_vars->u0, "SHAPIRO"))) {
     	// ------------------------------------------------
     	// Shapiro Initial Condition - Real Space
     	// ------------------------------------------------
@@ -1638,20 +1647,26 @@ void InitialConditions(fftw_complex* u_hat, double* u, const long int* N) {
    	// #endif
 }
 /**
- * Function to compute the Shapiro exact solution at the current time
- * @param t The current time in the simulation
+ * Function to compute the Shapiro exact solution at the current time and the error
+ * @param t 	The current time in the simulation
+ * @param norm 	Array to hold the Linf and L2 norms
  */
-void ShapiroExactSolution(double t) {
+void ShapiroExactSolution(double t, double* norm) {
 
 	// Initialize variables
 	int tmp1, tmp2, indx;
 	const long int Ny 		  = sys_vars->N[1];
 	const long int Nz 		  = sys_vars->N[2];
 	const long int Nz_Fourier = sys_vars->N[2] / 2 + 1; 
+	double err_x, err_y, err_z;
 
 	// Initialize local variables 
 	ptrdiff_t local_Nx = sys_vars->local_Nx;
 
+	// Initialize Norms
+	norm[0] = 0.0;
+	norm[1] = 0.0;
+	
 	// ------------------------------------------------
 	// Shapiro Exact Soln in Real Space
 	// ------------------------------------------------
@@ -1668,10 +1683,22 @@ void ShapiroExactSolution(double t) {
 				// Fill the velocities
 				run_data->exact_soln[SYS_DIM * indx + 0] = - A / (pow(K, 2.0) + pow(L, 2.0)) * (lambda * L * cos(K * run_data->x[0][i]) * sin(L * run_data->x[1][j]) * sin(M * run_data->x[2][k]) + M * K * sin(K * run_data->x[0][i]) * cos(L * run_data->x[1][j]) * cos(M * run_data->x[2][k])) * exp(- pow(lambda, 2.0) * t * sys_vars->NU);
 				run_data->exact_soln[SYS_DIM * indx + 1] = A / (pow(K, 2.0) + pow(L, 2.0)) * (lambda * K * sin(K * run_data->x[0][i]) * cos(L * run_data->x[1][j]) * sin(M * run_data->x[2][k]) - M * L * cos(K * run_data->x[0][i]) * sin(L * run_data->x[1][j]) * cos(M * run_data->x[2][k])) * exp(- pow(lambda, 2.0) * t * sys_vars->NU);
-				run_data->exact_soln[SYS_DIM * indx + 2] = A * cos(K * run_data->x[0][i]) * cos(L * run_data->x[1][j]) *  cos(M * run_data->x[2][k]) * exp(- pow(lambda, 2.0) * t * sys_vars->NU);			
+				run_data->exact_soln[SYS_DIM * indx + 2] = A * cos(K * run_data->x[0][i]) * cos(L * run_data->x[1][j]) *  cos(M * run_data->x[2][k]) * exp(- pow(lambda, 2.0) * t * sys_vars->NU);	
+
+				// Get the error
+				err_x = fabs(run_data->exact_soln[SYS_DIM * indx + 0] - run_data->u[SYS_DIM * indx + 0]);
+				err_y = fabs(run_data->exact_soln[SYS_DIM * indx + 1] - run_data->u[SYS_DIM * indx + 1]);
+				err_z = fabs(run_data->exact_soln[SYS_DIM * indx + 2] - run_data->u[SYS_DIM * indx + 2]);
+
+				// Norm
+				norm[0] += pow(err_x, 2.0) + pow(err_y, 2.0) + pow(err_z, 2.0);
+				norm[1] = fmax(fmax(fmax(err_x, err_y), err_z), norm[1]);
 			}
 		}
 	}
+
+	// Finish computing L2 norm
+	norm[0] = sqrt(norm[0]);
 }
 /**
  * Function to apply the selected dealiasing filter to the input array. Can be Fourier vorticity or velocity
@@ -2093,9 +2120,6 @@ void FreeMemory(RK_data_struct* RK_data) {
 	#endif
 	#if defined(__ENST_FLUX_SPECT)
 	fftw_free(run_data->enst_flux_spect);
-	#endif
-	#if defined(TESTING)
-	fftw_free(run_data->tg_soln);
 	#endif
 	#if defined(__TIME)
 	if (!(sys_vars->rank)){

@@ -47,7 +47,7 @@ void CreateOutputFilesWriteICs(const long int* N, double dt) {
 	int tmp1, tmp2;
 	int indx;
 
-    #if (defined(__VORT_FOUR) || defined(__MODES)) && !defined(DEBUG)
+    #if (defined(__VORT_FOUR) || defined(__MODES))
 	// Create compound datatype for the complex datasets
 	file_info->COMPLEX_DTYPE = CreateComplexDatatype();
 	#endif
@@ -1213,15 +1213,14 @@ void FinalWriteAndCloseOutputFile(const long int* N, int iters, int save_data_in
 			exit(1);
 		}
 	}
-	#if defined(DEBUG)
-	if (!sys_vars->rank) {
-		// Close test / debug file
-	    H5Fclose(file_info->test_file_handle);
-	}
-	#endif
+
 	#if defined(__VORT_FOUR) || defined(__MODES)
 	// Close the complex datatype identifier
-	H5Tclose(file_info->COMPLEX_DTYPE);
+	status = H5Tclose(file_info->COMPLEX_DTYPE);
+	if (status < 0) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to close compund datatype\n-->>Exiting....n");
+		exit(1);
+	}
 	#endif
 }
 /**
@@ -1298,8 +1297,8 @@ hid_t CreateGroup(hid_t file_handle, char* filename, char* group_name, double t,
 	return group_id;
 }
 /**
- * Function to create a HDF5 datatype for complex data
- */
+* Function to create a HDF5 datatype for complex data
+*/
 hid_t CreateComplexDatatype(void) {
 
 	// Declare HDF5 datatype variable
