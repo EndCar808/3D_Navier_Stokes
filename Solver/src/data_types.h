@@ -136,6 +136,9 @@
 #define MAX_VORT_LIM 1e+100     // The maximum allowed vorticity
 // Initial Condition Parameters
 #define KAPPA 1.0               // The wavenumber for the Taylor Green vortex intial condition
+#define K 2.0 					// The wavenumber in the x direction for the Shapiro initial condition
+#define L 2.0 					// The wavenumber in the y direction for the Shapiro initial condition
+#define M 2.0 					// The wavenumber in the z direction for the Shapiro initial condition
 // ---------------------------------------------------------------------
 //  Global Struct Definitions
 // ---------------------------------------------------------------------

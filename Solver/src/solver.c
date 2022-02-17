@@ -157,6 +157,10 @@ void SpectralSolve(void) {
 		// Write To File
 		// -------------------------------
 		if ((iters > trans_steps) && (iters % sys_vars->SAVE_EVERY == 0)) {
+			#if defined(TESTING)
+			ShapiroExactSolution(t);
+			#endif
+
 			// Record System Measurables
 			RecordSystemMeasures(t, save_data_indx, RK_data);
 
@@ -1556,9 +1560,34 @@ void InitialConditions(fftw_complex* u_hat, double* u, const long int* N) {
     		}
     	}
 
-    	// Transform velocities to Fourier space & dealias
+    	// Transform velocities to Fourier space
     	fftw_mpi_execute_dft_r2c(sys_vars->fftw_3d_dft_batch_r2c, u, u_hat);
-    	ApplyDealiasing(u_hat, SYS_DIM, N);
+    }
+    if(!(strcmp(sys_vars->u0, "TAYLOR_GREEN"))) {
+    	// ------------------------------------------------
+    	// Shapiro Initial Condition - Real Space
+    	// ------------------------------------------------
+    	// Compute the lambda term
+    	double lambda = sqrt(pow(K, 2.0) + pow(L, 2.0) + pow(M, 2.0));
+    	double t = 0.0;
+    	
+    	for (int i = 0; i < local_Nx; ++i) {
+    		tmp1 = i * Ny;
+    		for (int j = 0; j < Ny; ++j) {
+    			tmp2 = (Nz + 2) * (tmp1 + j);
+    			for (int k = 0; k < Nz; ++k) {
+    				indx = tmp2 + k;
+    				
+    				// Fill the velocities
+    				u[SYS_DIM * indx + 0] = - A / (pow(K, 2.0) + pow(L, 2.0)) * (lambda * L * cos(K * run_data->x[0][i]) * sin(L * run_data->x[1][j]) * sin(M * run_data->x[2][k]) + M * K * sin(K * run_data->x[0][i]) * cos(L * run_data->x[1][j]) * cos(M * run_data->x[2][k])) * exp(- pow(lambda, 2.0) * t * sys_vars->NU);
+    				u[SYS_DIM * indx + 1] = A / (pow(K, 2.0) + pow(L, 2.0)) * (lambda * K * sin(K * run_data->x[0][i]) * cos(L * run_data->x[1][j]) * sin(M * run_data->x[2][k]) - M * L * cos(K * run_data->x[0][i]) * sin(L * run_data->x[1][j]) * cos(M * run_data->x[2][k])) * exp(- pow(lambda, 2.0) * t * sys_vars->NU);
+    				u[SYS_DIM * indx + 2] = A * cos(K * run_data->x[0][i]) * cos(L * run_data->x[1][j]) *  cos(M * run_data->x[2][k]) * exp(- pow(lambda, 2.0) * t * sys_vars->NU);			
+    			}
+    		}
+    	}
+
+    	// Transform velocities to Fourier space
+    	fftw_mpi_execute_dft_r2c(sys_vars->fftw_3d_dft_batch_r2c, u, u_hat);
     }
     else if(!(strcmp(sys_vars->u0, "TESTING"))) {
     	// ------------------------------------------------
@@ -1589,7 +1618,7 @@ void InitialConditions(fftw_complex* u_hat, double* u, const long int* N) {
    	// -------------------------------------------------
    	// Initialize the Dealiasing
    	// -------------------------------------------------
-   	// ApplyDealiasing(w_hat, 1, N);
+   	ApplyDealiasing(u_hat, SYS_DIM, N);
    	   
    	   
    	// -------------------------------------------------
@@ -1607,6 +1636,42 @@ void InitialConditions(fftw_complex* u_hat, double* u, const long int* N) {
    	// 	TaylorGreenSoln(0.0, N);
    	// }
    	// #endif
+}
+/**
+ * Function to compute the Shapiro exact solution at the current time
+ * @param t The current time in the simulation
+ */
+void ShapiroExactSolution(double t) {
+
+	// Initialize variables
+	int tmp1, tmp2, indx;
+	const long int Ny 		  = sys_vars->N[1];
+	const long int Nz 		  = sys_vars->N[2];
+	const long int Nz_Fourier = sys_vars->N[2] / 2 + 1; 
+
+	// Initialize local variables 
+	ptrdiff_t local_Nx = sys_vars->local_Nx;
+
+	// ------------------------------------------------
+	// Shapiro Exact Soln in Real Space
+	// ------------------------------------------------
+	// Compute the lambda term
+	double lambda = sqrt(pow(K, 2.0) + pow(L, 2.0) + pow(M, 2.0));
+	
+	for (int i = 0; i < local_Nx; ++i) {
+		tmp1 = i * Ny;
+		for (int j = 0; j < Ny; ++j) {
+			tmp2 = (Nz + 2) * (tmp1 + j);
+			for (int k = 0; k < Nz; ++k) {
+				indx = tmp2 + k;
+				
+				// Fill the velocities
+				run_data->exact_soln[SYS_DIM * indx + 0] = - A / (pow(K, 2.0) + pow(L, 2.0)) * (lambda * L * cos(K * run_data->x[0][i]) * sin(L * run_data->x[1][j]) * sin(M * run_data->x[2][k]) + M * K * sin(K * run_data->x[0][i]) * cos(L * run_data->x[1][j]) * cos(M * run_data->x[2][k])) * exp(- pow(lambda, 2.0) * t * sys_vars->NU);
+				run_data->exact_soln[SYS_DIM * indx + 1] = A / (pow(K, 2.0) + pow(L, 2.0)) * (lambda * K * sin(K * run_data->x[0][i]) * cos(L * run_data->x[1][j]) * sin(M * run_data->x[2][k]) - M * L * cos(K * run_data->x[0][i]) * sin(L * run_data->x[1][j]) * cos(M * run_data->x[2][k])) * exp(- pow(lambda, 2.0) * t * sys_vars->NU);
+				run_data->exact_soln[SYS_DIM * indx + 2] = A * cos(K * run_data->x[0][i]) * cos(L * run_data->x[1][j]) *  cos(M * run_data->x[2][k]) * exp(- pow(lambda, 2.0) * t * sys_vars->NU);			
+			}
+		}
+	}
 }
 /**
  * Function to apply the selected dealiasing filter to the input array. Can be Fourier vorticity or velocity
@@ -1803,6 +1868,15 @@ void AllocateMemory(const long int* NBatch, RK_data_struct* RK_data) {
 		exit(1);
 	}
 
+	#if defined(TESTING)
+	// Allocate the Shapiro exact solution
+	run_data->exact_soln     = (double* )fftw_malloc(sizeof(double) * 2 * sys_vars->alloc_local_batch);
+	if (run_data->exact_soln == NULL) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to allocate memory for ["CYAN"%s"RESET"]\n-->> Exiting!!!\n", "Real Space Velocities");
+		exit(1);
+	}	
+	#endif
+
 	// -------------------------------
 	// Allocate Integration Variables 
 	// -------------------------------
@@ -1990,6 +2064,9 @@ void FreeMemory(RK_data_struct* RK_data) {
 	fftw_free(run_data->u_hat);
 	fftw_free(run_data->w);
 	fftw_free(run_data->w_hat);
+	#if defined(TESTING)
+	fftw_free(run_data->exact_soln);	
+	#endif
 	#if defined(__SYS_MEASURES)
 	fftw_free(run_data->tot_energy);
 	fftw_free(run_data->tot_enstr);

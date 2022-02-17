@@ -243,6 +243,26 @@ void CreateOutputFilesWriteICs(const long int* N, double dt) {
 	WriteGroupDataReal(0.0, 0, main_group_id, "u", H5T_NATIVE_DOUBLE, d_set_rank4D, dset_dims4D, slab_dims4D, mem_space_dims4D, sys_vars->local_Nx_start, run_data->u);
 	#endif
 
+	///------------------------- Shapiro exact solution
+	#if defined(TESTING)
+	// Specify dataset dimensions
+	dset_dims4D[0] 	  = Nx;
+	dset_dims4D[1] 	  = Ny;
+	dset_dims4D[2] 	  = Nz;
+	dset_dims4D[3] 	  = SYS_DIM;
+	slab_dims4D[0]      = sys_vars->local_Nx;
+	slab_dims4D[1]      = Ny;
+	slab_dims4D[2]      = Nz;
+	slab_dims4D[3]      = SYS_DIM;
+	mem_space_dims4D[0] = sys_vars->local_Nx;
+	mem_space_dims4D[1] = Ny;
+	mem_space_dims4D[2] = Nz + 2;
+	mem_space_dims4D[3] = SYS_DIM;
+
+	// Write the real space vorticity
+	WriteGroupDataReal(0.0, 0, main_group_id, "ExactSoln", H5T_NATIVE_DOUBLE, d_set_rank4D, dset_dims4D, slab_dims4D, mem_space_dims4D, sys_vars->local_Nx_start, run_data->exact_soln);
+	#endif
+
 	///-------------------------- Write Spectra
 	#if defined(__ENST_SPECT) || defined(__ENRG_SPECT) || defined(__ENST_FLUX_SPECT) || defined(__ENRG_FLUX_SPECT)
 	// Gather Spectra data and write to file
@@ -674,6 +694,26 @@ void WriteDataToFile(double t, double dt, long int iters) {
 
 	// Write the real space vorticity
 	WriteGroupDataReal(t, (int)iters, main_group_id, "u", H5T_NATIVE_DOUBLE, d_set_rank4D, dset_dims4D, slab_dims4D, mem_space_dims4D, sys_vars->local_Nx_start, run_data->u);
+	#endif
+
+	///------------------------- Shapiro exact solution
+	#if defined(TESTING)
+	// Specify dataset dimensions
+	dset_dims4D[0] 	  = Nx;
+	dset_dims4D[1] 	  = Ny;
+	dset_dims4D[2] 	  = Nz;
+	dset_dims4D[3] 	  = SYS_DIM;
+	slab_dims4D[0]      = sys_vars->local_Nx;
+	slab_dims4D[1]      = Ny;
+	slab_dims4D[2]      = Nz;
+	slab_dims4D[3]      = SYS_DIM;
+	mem_space_dims4D[0] = sys_vars->local_Nx;
+	mem_space_dims4D[1] = Ny;
+	mem_space_dims4D[2] = Nz + 2;
+	mem_space_dims4D[3] = SYS_DIM;
+
+	// Write the real space vorticity
+	WriteGroupDataReal(t, (int)iters, main_group_id, "ExactSoln", H5T_NATIVE_DOUBLE, d_set_rank4D, dset_dims4D, slab_dims4D, mem_space_dims4D, sys_vars->local_Nx_start, run_data->exact_soln);
 	#endif
 
 	///-------------------------- Write Spectra

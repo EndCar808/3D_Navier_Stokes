@@ -43,6 +43,7 @@ void EnstrophySpectrum(void);
 void ComputeSystemMeasurables(int iter);
 double GetMaxData(void);
 void PrintUpdateToTerminal(int iters, double t, double dt, double T, int save_data_indx);
+void ShapiroExactSolution(double t);
 void InitializeSystemMeasurables(RK_data_struct* RK_data);
 void RecordSystemMeasures(double t, int print_indx, RK_data_struct* RK_data);
 void InitializeIntegrationVariables(double* t0, double* t, double* dt, double* T, long int* trans_steps);
