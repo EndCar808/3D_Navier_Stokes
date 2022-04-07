@@ -349,9 +349,9 @@ void RK5DPStep(const double dt, const long int* N, const int iters, const ptrdif
 
 				#if defined(__EULER)
 				// Update the Fourier space vorticity with the RHS
-				run_data->w_hat[SYS_SIM * indx + 0] = run_data->u_hat[SYS_SIM * indx + 0] + (dt * (RK5_B1 * RK_data->RK1[SYS_SIM * indx + 0]) + dt * (RK5_B3 * RK_data->RK3[SYS_SIM * indx + 0]) + dt * (RK5_B4 * RK_data->RK4[SYS_SIM * indx + 0]) + dt * (RK5_B5 * RK_data->RK5[SYS_SIM * indx + 0]) + dt * (RK5_B6 * RK_data->RK6[SYS_SIM * indx + 0]));
-				run_data->w_hat[SYS_SIM * indx + 1] = run_data->u_hat[SYS_SIM * indx + 1] + (dt * (RK5_B1 * RK_data->RK1[SYS_SIM * indx + 1]) + dt * (RK5_B3 * RK_data->RK3[SYS_SIM * indx + 1]) + dt * (RK5_B4 * RK_data->RK4[SYS_SIM * indx + 1]) + dt * (RK5_B5 * RK_data->RK5[SYS_SIM * indx + 1]) + dt * (RK5_B6 * RK_data->RK6[SYS_SIM * indx + 1]));
-				run_data->w_hat[SYS_SIM * indx + 2] = run_data->u_hat[SYS_SIM * indx + 2] + (dt * (RK5_B1 * RK_data->RK1[SYS_SIM * indx + 2]) + dt * (RK5_B3 * RK_data->RK3[SYS_SIM * indx + 2]) + dt * (RK5_B4 * RK_data->RK4[SYS_SIM * indx + 2]) + dt * (RK5_B5 * RK_data->RK5[SYS_SIM * indx + 2]) + dt * (RK5_B6 * RK_data->RK6[SYS_SIM * indx + 2]));
+				run_data->u_hat[SYS_SIM * indx + 0] = run_data->u_hat[SYS_SIM * indx + 0] + (dt * (RK5_B1 * RK_data->RK1[SYS_SIM * indx + 0]) + dt * (RK5_B3 * RK_data->RK3[SYS_SIM * indx + 0]) + dt * (RK5_B4 * RK_data->RK4[SYS_SIM * indx + 0]) + dt * (RK5_B5 * RK_data->RK5[SYS_SIM * indx + 0]) + dt * (RK5_B6 * RK_data->RK6[SYS_SIM * indx + 0]));
+				run_data->u_hat[SYS_SIM * indx + 1] = run_data->u_hat[SYS_SIM * indx + 1] + (dt * (RK5_B1 * RK_data->RK1[SYS_SIM * indx + 1]) + dt * (RK5_B3 * RK_data->RK3[SYS_SIM * indx + 1]) + dt * (RK5_B4 * RK_data->RK4[SYS_SIM * indx + 1]) + dt * (RK5_B5 * RK_data->RK5[SYS_SIM * indx + 1]) + dt * (RK5_B6 * RK_data->RK6[SYS_SIM * indx + 1]));
+				run_data->u_hat[SYS_SIM * indx + 2] = run_data->u_hat[SYS_SIM * indx + 2] + (dt * (RK5_B1 * RK_data->RK1[SYS_SIM * indx + 2]) + dt * (RK5_B3 * RK_data->RK3[SYS_SIM * indx + 2]) + dt * (RK5_B4 * RK_data->RK4[SYS_SIM * indx + 2]) + dt * (RK5_B5 * RK_data->RK5[SYS_SIM * indx + 2]) + dt * (RK5_B6 * RK_data->RK6[SYS_SIM * indx + 2]));
 				#elif defined(__NAVIER)
 				// Compute the pre factors for the RK4CN update step
 				k_sqr = (double) (run_data->k[0][i] * run_data->k[0][i] + run_data->k[1][j] * run_data->k[1][j] + run_data->k[2][k] * run_data->k[2][k]);

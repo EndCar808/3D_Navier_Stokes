@@ -125,7 +125,7 @@
 #define DP_DELTA_MIN 0.01       // The min delta value for the Dormand Prince scheme
 #define DP_DELTA_MAX 1.5 		// The max delta value for the Dormand Prince scheme
 #define DP_DELTA 0.8 			// The scaling parameter of the error for the Dormand Prince Scheme
-#define DP_MAX_TRY 20           // The maximum number of step tries before giving up
+#define DP_MAX_TRY 50           // The maximum number of step tries before giving up
 // System checking parameters
 #define MIN_STEP_SIZE 1e-10 	// The minimum allowed stepsize for the solver 
 #define MAX_ITERS 1e+12			// The maximum iterations to perform
