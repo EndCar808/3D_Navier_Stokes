@@ -67,12 +67,8 @@ int main(int argc, char** argv) {
 	sys_vars->dz = Lz / Nz;
 
 
-	// --------------------------------
-	//  Create Complex Datatype
-	// --------------------------------
-	// Create compound datatype for the complex datasets
-	file_info->COMPLEX_DTYPE = CreateComplexDatatype();
-
+	
+	OpenInputAndInitialize();
 
 	
 	printf("Nx: %d Lx: %lf dx: %lf\nNy: %d Ly: %lf dy: %lf\nNz: %d Lz: %lf dz: %lf\n\n", Nx, Lx, sys_vars->dx, Ny, Ly, sys_vars->dy, Nz, Lz, sys_vars->dz);
