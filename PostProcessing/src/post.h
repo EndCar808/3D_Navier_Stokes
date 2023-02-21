@@ -2,7 +2,7 @@
 * @file hdf5_funcs.h  
 * @author Enda Carroll
 * @date Feb 2023
-* @brief File containing function prototpyes for hdf5_funcs file
+* @brief File containing function prototpyes for main file
 */
 // ---------------------------------------------------------------------
 //  Standard Libraries and Headers
@@ -15,13 +15,9 @@
 // ---------------------------------------------------------------------
 //  Function Prototpyes
 // ---------------------------------------------------------------------
-hid_t CreateComplexDatatype(void);
-void OpenInputAndInitialize(void);
-void ReadInData(int snap_indx);
-// void OpenOutputFile(void);
-// void WriteDataToFile(double t, long int snap);
-// hid_t CreateGroup(hid_t file_handle, char* filename, char* group_name, double t, long int snap);
-// void FinalWriteAndClose(void);
+void AllocateMemory(const long int* N);
+void InitializeFFTWPlans(const long int* N);
+void FreeMemoryAndCleanUp(void);
 // ---------------------------------------------------------------------
 //  End of File
 // ---------------------------------------------------------------------

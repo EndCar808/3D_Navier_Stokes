@@ -62,6 +62,7 @@ typedef struct system_vars_struct {
 	fftw_plan fftw_3d_dft_r2c;			// FFTW plan to perform transform from Real to Fourier
 	fftw_plan fftw_3d_dft_c2r;			// FFTW plan to perform transform from Fourier to Real
 	fftw_plan fftw_3d_dft_batch_r2c;	// FFTW plan to perform a batch transform from Real to Fourier
+	fftw_plan fftw_3d_dft_batch_c2r;	// FFTW plan to perform a batch transform from Real to Fourier
 	long int num_snaps;					// Number of snapshots in the input data file
 	long int kmax; 						// The largest dealiased wavenumber
 	double t0;							// Intial time
@@ -81,10 +82,10 @@ typedef struct runtime_data_struct {
 	double* x[SYS_DIM];      // Array to hold collocation pts
 	int* k[SYS_DIM];		 // Array to hold wavenumbers
 	fftw_complex* w_hat;     // Fourier space vorticity
-	fftw_complex* tmp_w_hat; // Temporary Fourier space vorticity
+	fftw_complex* w_hat_tmp; // Temporary Fourier space vorticity
 	fftw_complex* u_hat;     // Fourier space velocity
-	fftw_complex* tmp_u_hat; // Fourier space velocity
-	double* tmp_u; 			 // Temporary array to read & write in velocities
+	fftw_complex* u_hat_tmp; // Fourier space velocity
+	double* u_tmp; 			 // Temporary array to read & write in velocities
 	double* w;				 // Real space vorticity
 	double* u;				 // Real space velocity
 	double* time;			 // Array to hold the simulation times
