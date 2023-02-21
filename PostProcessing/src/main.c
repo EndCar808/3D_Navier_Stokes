@@ -31,17 +31,29 @@
 // ---------------------------------------------------------------------
 int main(int argc, char** argv) {
 
+	printf("\n\ngcc version: %d.%d.%d\n\n", __GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__);
+
 	// Initialize variables
 	int Nx = atoi(argv[1]);
 	int Ny = Nx;
 	int Nz = Ny;
 	int Max_Incr = Nx / 2;
-	int num_threads = atoi(argv[2]);
+	int num_thread = atoi(argv[2]);
 	double increment;
 	int tmp1, tmp2, indx;
+	int num_pow = NUM_POW;
 
-	omp_set_num_threads(num_threads);
-	printf("\n\nN: %d\t Max r: %d\tThreads: %d\n\n", Nx, Max_Incr, num_threads);
+	double Lx = 1.0;
+	double Ly = 1.0;
+	double Lz = 1.0;
+	double dx = Lx / Nx;
+	double dy = Ly / Ny;
+	double dz = Lz / Nz;
+
+	omp_set_num_threads(num_thread);
+	int grain_size = NUM_POW * Max_Incr / num_thread;
+	printf("\n\nN: %d\t Max r: %d\t Num_pow: %d\tThreads: %d Grainsize: %d\n", Nx, Max_Incr, num_pow, num_thread, grain_size);
+	printf("Nx: %d Lx: %lf dx: %lf\nNy: %d Ly: %lf dy: %lf\nNz: %d Lz: %lf dz: %lf\n\n", Nx, Lx, dx, Ny, Ly, dy, Nz, Lz, dz);
 
 	// Allocate test memory
 	double* data = (double* )fftw_malloc(sizeof(double) * Nx * Ny * Nz * SYS_DIM);
@@ -49,15 +61,15 @@ int main(int argc, char** argv) {
 	double* str_func_ser[NUM_POW];
 
 	// Initialize test memory
-	for (int i = 0; i < Nz; ++i) {
+	for (int i = 0; i < Nx; ++i) {
 		tmp1 = i * Ny;
 		for (int j = 0; j < Ny; ++j) {
-			tmp2 = Nx * (tmp1 + j);
-			for (int k = 0; k < Nx; ++k) {
+			tmp2 = Nz * (tmp1 + j);
+			for (int k = 0; k < Nz; ++k) {
 				indx = tmp2 + k;
-				for (int l = 0; l < SYS_DIM; ++l) {
-					data[SYS_DIM * (Nx * (i * Ny + j) + k) + l] = 1.0;
-				}
+					data[SYS_DIM * indx + 0] = i * dx;
+					data[SYS_DIM * indx + 1] = j * dy;
+					data[SYS_DIM * indx + 2] = k * dz;
 			}
 		}
 	}
@@ -70,14 +82,15 @@ int main(int argc, char** argv) {
 		}
 	}
 
-	printf("gcc version: %d.%d.%d\n", __GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__);
+	// Get parllel time
+	double start = omp_get_wtime();
 	
-	// Loop over powers
-	// #pragma omp parallel num_threads(num_threads) shared(data, str_func_ser) private(Nx, Ny, Nz, tmp1, tmp2, indx, Max_Incr)
-	// {
-	// 	#pragma omp single 
-	// 	{
-	// 		#pragma omp taskloop reduction(+:increment) 
+	// // Loop over powers
+	#pragma omp parallel num_threads(num_thread) shared(data, str_func_par) private(tmp1, tmp2, indx)
+	{
+		#pragma omp single 
+		{
+			#pragma omp taskloop reduction(+:increment) grainsize(grain_size) collapse(2)
 			for (int p = 1; p <= NUM_POW; ++p) {
 				// Loop over increments
 				for (int r = 1; r <= Max_Incr; ++r) {
@@ -85,34 +98,41 @@ int main(int argc, char** argv) {
 					increment = 0.0;
 
 					// Loop over space
-					for (int i = 0; i < Nz; ++i) {
-						tmp1 = i * Ny;
+					// #pragma omp taskloop reduction(+:increment) grainsize(Nx * Ny * Nz / num_thread) collapse(3)
+					for (int i = 0; i < Nx; ++i) {
 						for (int j = 0; j < Ny; ++j) {
-							tmp2 = Nx * (tmp1 + j);
-							for (int k = 0; k < Nx; ++k) {
+							for (int k = 0; k < Nz; ++k) {
+								tmp1 = i * Ny;
+								tmp2 = Nz * (tmp1 + j);
 								indx = tmp2 + k;
 
 								// Compute increments
-								increment += pow(data[SYS_DIM * (Nx * (i * Ny + j) + ((k + r) % Nx)) + 0]  - data[SYS_DIM * indx + 0], p);
-								increment += pow(data[SYS_DIM * (Nx * (i * Ny + ((j + r) % Ny)) + Nx) + 1] - data[SYS_DIM * indx + 1], p);
-								increment += pow(data[SYS_DIM * (Nx * (((i + r) % Nz) * Ny + j) + k) + 2]  - data[SYS_DIM * indx + 2], p);
+								increment += pow(data[SYS_DIM * (Nz * (i * Ny + j) + ((k + r) % Nz)) + 0]  - data[SYS_DIM * indx + 0], p);
+								increment += pow(data[SYS_DIM * (Nz * (i * Ny + ((j + r) % Ny)) + k) + 1] - data[SYS_DIM * indx + 1], p);
+								increment += pow(data[SYS_DIM * (Nz * (((i + r) % Nx) * Ny + j) + k) + 2]  - data[SYS_DIM * indx + 2], p);
 							}
 						}
 					}
 
 					// Update structure function
-					str_func_ser[p - 1][r - 1] = increment; 
+					str_func_par[p - 1][r - 1] = increment; 
 				}
 			}
-	// 	} 
-	// }
+		} 
+	}
 
+	// Get parallel time
+	double par_time = omp_get_wtime() - start;
+	double ser_time = 0.0;
+	printf("\n\nTimes: %lfs (ser) %lfs (par)\t\tSpeed Up: %lf\n", ser_time, par_time, ser_time / par_time);
 
+	double err = 0.0;
 	for (int p = 1; p <= NUM_POW; ++p) {
 		for (int r = 1; r <= Max_Incr; ++r) {
-			printf("str_func[%d][%d]: %lf\n", p, r, str_func_ser[p - 1][r - 1]);
+			err += str_func_par[p - 1][r - 1];
 		}
 	}
+	printf("str_func[%d][%d]: %1.16lf\n", 0, 0, err);
 
 	for (int p = 0; p < NUM_POW; ++p) {
 		fftw_free(str_func_ser[p]);
