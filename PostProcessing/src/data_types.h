@@ -47,8 +47,8 @@
 #define SYS_DIM 3 				// The system dimension i.e., 3D
 // Statistics definitions
 #define N_BINS 1000				// The number of histogram bins to use
-#define NUM_INCR 2              // The number of increment length scales
-#define INCR_TYPES 2 			// The number of increment directions i.e., longitudinal and transverse
+#define NUM_INCR 5              // The number of increment length scales
+#define INCR_TYPES 1 			// The number of increment directions i.e., longitudinal and transverse
 #define BIN_LIM 40              // The limit of the bins for the velocity increments
 #define NUM_POW 6               // The number of powers for the str function
 // ---------------------------------------------------------------------
@@ -93,18 +93,19 @@ typedef struct runtime_data_struct {
 
 // Post processing stats data struct
 typedef struct stats_data_struct {
-	gsl_rstat_workspace* r_stat_grad_u[SYS_DIM + 1];		  		// Workplace for the running stats for the gradients of velocity (both for each direction and combined)
-	gsl_rstat_workspace* r_stat_grad_w[SYS_DIM + 1];		  		// Workplace for the running stats for the gradients of vorticity (both for each direction and combined)
-	gsl_rstat_workspace* r_stat_w;									// Workplace for the running stats for the velocity (both for each direction and combined)
-	gsl_rstat_workspace* r_stat_u[SYS_DIM + 1];						// Workplace for the running stats for the vorticity (both for each direction and combined)
-	gsl_rstat_workspace* r_stat_vel_incr[INCR_TYPES][NUM_INCR];		// Workplace for the running stats for the velocity increments
-	gsl_rstat_workspace* r_stat_vort_incr[INCR_TYPES][NUM_INCR];	// Workplace for the running stats for the vorticity increments
+	gsl_rstat_workspace* grad_u_stats[SYS_DIM + 1];		  			// Workplace for the running stats for the gradients of velocity (both for each direction and combined)
+	gsl_rstat_workspace* grad_w_stats[SYS_DIM + 1];		  			// Workplace for the running stats for the gradients of vorticity (both for each direction and combined)
+	gsl_rstat_workspace* w_stats;									// Workplace for the running stats for the velocity (both for each direction and combined)
+	gsl_rstat_workspace* u_stats[SYS_DIM + 1];						// Workplace for the running stats for the vorticity (both for each direction and combined)
+	gsl_rstat_workspace* u_incr_stats[INCR_TYPES][NUM_INCR];		// Workplace for the running stats for the velocity increments
+	gsl_rstat_workspace* w_incr_stats[INCR_TYPES][NUM_INCR];		// Workplace for the running stats for the vorticity increments
 	gsl_histogram* w_hist;		 									// Histogram struct for the vorticity distribution
 	gsl_histogram* u_hist;		  									// Histrogam struct for the velocity distribution
-	gsl_histogram* vel_grad[SYS_DIM + 1];		 					// Array to hold the PDFs of the longitudinal and transverse velocity gradients 
-	gsl_histogram* vort_grad[SYS_DIM + 1];		 					// Array to hold the PDFs of the longitudinal and transverse vorticity gradients 
-	gsl_histogram* vel_incr[INCR_TYPES][NUM_INCR]; 					// Array to hold the PDFs of the longitudinal and transverse velocity increments for each increment
-	gsl_histogram* w_incr[INCR_TYPES][NUM_INCR]; 					// Array to hold the PDFs of the longitudinal and transverse vorticity increments for each increment
+	gsl_histogram* u_grad_hist[SYS_DIM + 1];	 					// Array to hold the PDFs of the longitudinal and transverse velocity gradients 
+	gsl_histogram* w_grad_hist[SYS_DIM + 1];	 					// Array to hold the PDFs of the longitudinal and transverse vorticity gradients 
+	gsl_histogram* u_incr_hist[INCR_TYPES][NUM_INCR];				// Array to hold the PDFs of the longitudinal and transverse velocity increments for each increment
+	gsl_histogram* w_incr_hist[INCR_TYPES][NUM_INCR];				// Array to hold the PDFs of the longitudinal and transverse vorticity increments for each increment
+	int * increments; 												// Pointer to array to hold the array index increments
 } stats_data_struct;
 
 // HDF5 file info struct

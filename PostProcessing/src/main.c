@@ -18,6 +18,7 @@
 #include "data_types.h"
 #include "hdf5_func.h"
 #include "post.h"
+#include "stats.h"
 // #include "utils.h"
 // #include "str_func.h"
 // ---------------------------------------------------------------------
@@ -69,48 +70,33 @@ int main(int argc, char** argv) {
 	sys_vars->dy = Ly / Ny;
 	sys_vars->dz = Lz / Nz;
 
+
+
 	AllocateMemory(sys_vars->N);
 
 	InitializeFFTWPlans(sys_vars->N);
+
+	AllocateStatsObjects();
+
+
 	
 	printf("Nx: %d Lx: %lf dx: %lf\nNy: %d Ly: %lf dy: %lf\nNz: %d Lz: %lf dz: %lf\n\n", Nx, Lx, sys_vars->dx, Ny, Ly, sys_vars->dy, Nz, Lz, sys_vars->dz);
 
-	// for (int i = 0; i < sys_vars->N[0]; ++i) {
-	// 	if (i < Nz_Fourier) {
-	// 		printf("kx[%d]: %d \t ky[%d]: %d \t kz[%d]: %d\n", i, run_data->k[0][i], i, run_data->k[1][i], i, run_data->k[2][i]);
-	// 	}
-	// 	else {
-	// 		printf("kx[%d]: %d \t ky[%d]: %d \n", i, run_data->k[0][i], i, run_data->k[1][i]);
-	// 	}
-	// }
-	
-	fftw_complex tmp = 0.0 + 0.0 * I;
-	double tmp_r = 0.0;
+	Precompute();
 
 	for (int snap = 0; snap < sys_vars->num_snaps; ++snap) { 
+
+		printf("Post Step: %d/%ld\n", snap + 1, sys_vars->num_snaps);
 		
 		// Read In Data
 		ReadInData(snap);
 
-		for (int i = 0; i < Nx; ++i) {
-			tmp1 = i * Ny;
-			for (int j = 0; j < Ny; ++j) {
-				tmp2 = Nz_Fourier * (tmp1 + j);
-				for (int k = 0; k < Nz_Fourier; ++k) {
-					indx = tmp2 + k;
-
-					tmp += run_data->u_hat_tmp[SYS_DIM * indx + 0];
-					tmp += run_data->u_hat_tmp[SYS_DIM * indx + 1];
-					tmp += run_data->u_hat_tmp[SYS_DIM * indx + 2];
-					tmp_r += run_data->u[SYS_DIM * indx + 0];
-					tmp_r += run_data->u[SYS_DIM * indx + 1];
-					tmp_r += run_data->u[SYS_DIM * indx + 2];
-				}
-			}
-		}
-		printf("Snap: %d\t\twx: %1.16lf %1.16lf i\t\t %1.16lf\n", snap, creal(tmp), cimag(tmp), tmp_r);
+		
 	}
 
+	FreeStatsObjects();
+
+	FreeMemoryAndCleanUp();
 
 	return 0;
 }
@@ -235,116 +221,4 @@ void FreeMemoryAndCleanUp(void) {
 	fftw_destroy_plan(sys_vars->fftw_3d_dft_batch_c2r);
 	fftw_destroy_plan(sys_vars->fftw_3d_dft_batch_r2c);
 
-}
-
-void str_func_test(int Nx, int Ny, int Nz, int num_thread) {
-
-	int Max_Incr = Nx / 2;
-	double increment;
-	int tmp1, tmp2, indx;
-
-
-	omp_set_num_threads(num_thread);
-	int grain_size = NUM_POW * Max_Incr / num_thread;
-
-	double Lx = 1.0;
-	double Ly = 1.0;
-	double Lz = 1.0;
-	double dx = Lx / Nx;
-	double dy = Ly / Ny;
-	double dz = Lz / Nz;
-
-
-	// Allocate test memory
-	double* data = (double* )fftw_malloc(sizeof(double) * Nx * Ny * Nz * SYS_DIM);
-	double* str_func_par[NUM_POW];
-	double* str_func_ser[NUM_POW];
-
-	// Initialize test memory
-	for (int i = 0; i < Nx; ++i) {
-		tmp1 = i * Ny;
-		for (int j = 0; j < Ny; ++j) {
-			tmp2 = Nz * (tmp1 + j);
-			for (int k = 0; k < Nz; ++k) {
-				indx = tmp2 + k;
-					data[SYS_DIM * indx + 0] = i * dx;
-					data[SYS_DIM * indx + 1] = j * dy;
-					data[SYS_DIM * indx + 2] = k * dz;
-			}
-		}
-	}
-	
-	for (int p = 1; p <= NUM_POW; ++p) {
-		str_func_ser[p - 1] = (double* )fftw_malloc(sizeof(double) * Max_Incr);
-		str_func_par[p - 1] = (double* )fftw_malloc(sizeof(double) * Max_Incr);
-		for (int r = 0; r < Max_Incr; ++r){
-			str_func_par[p - 1][r] = 0.0;
-			str_func_ser[p - 1][r] = 0.0;
-		}
-	}
-
-	
-
-
-	printf("\n\nN: %d\t Max r: %d\t Num_pow: %d\tThreads: %d Grainsize: %d\n", Nx, Max_Incr, NUM_POW, num_thread, grain_size);
-
-
-	// Get parllel time
-	double start = omp_get_wtime();
-	
-	// // Loop over powers
-	// #pragma omp parallel num_threads(num_thread) shared(data, str_func_par) private(tmp1, tmp2, indx)
-	// {
-	// 	#pragma omp single 
-	// 	{
-	// 		#pragma omp taskloop reduction(+:increment) grainsize(grain_size) collapse(2)
-			for (int p = 1; p <= NUM_POW; ++p) {
-				// Loop over increments
-				for (int r = 1; r <= Max_Incr; ++r) {
-					// Initialize increment
-					increment = 0.0;
-
-					// Loop over space
-					// #pragma omp taskloop reduction(+:increment) grainsize(Nx * Ny * Nz / num_thread) collapse(3)
-					for (int i = 0; i < Nx; ++i) {
-						for (int j = 0; j < Ny; ++j) {
-							for (int k = 0; k < Nz; ++k) {
-								tmp1 = i * Ny;
-								tmp2 = Nz * (tmp1 + j);
-								indx = tmp2 + k;
-
-								// Compute increments
-								increment += pow(data[SYS_DIM * (Nz * (i * Ny + j) + ((k + r) % Nz)) + 0]  - data[SYS_DIM * indx + 0], p);
-								increment += pow(data[SYS_DIM * (Nz * (i * Ny + ((j + r) % Ny)) + k) + 1] - data[SYS_DIM * indx + 1], p);
-								increment += pow(data[SYS_DIM * (Nz * (((i + r) % Nx) * Ny + j) + k) + 2]  - data[SYS_DIM * indx + 2], p);
-							}
-						}
-					}
-
-					// Update structure function
-					str_func_par[p - 1][r - 1] = increment; 
-				}
-			}
-	// 	} 
-	// }
-
-	// Get parallel time
-	double par_time = omp_get_wtime() - start;
-	double ser_time = 0.0;
-	printf("\n\nTimes: %lfs (ser) %lfs (par)\t\tSpeed Up: %lf\n", ser_time, par_time, ser_time / par_time);
-
-	double err = 0.0;
-	for (int p = 1; p <= NUM_POW; ++p) {
-		for (int r = 1; r <= Max_Incr; ++r) {
-			err += str_func_par[p - 1][r - 1];
-		}
-	}
-	printf("str_func[%d][%d]: %1.16lf\n", 0, 0, err);
-
-
-	for (int p = 0; p < NUM_POW; ++p) {
-		fftw_free(str_func_ser[p]);
-		fftw_free(str_func_par[p]);
-	}
-	fftw_free(data);
 }
