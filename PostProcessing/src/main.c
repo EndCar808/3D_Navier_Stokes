@@ -70,40 +70,42 @@ int main(int argc, char** argv) {
 		}
 	}
 
+	printf("gcc version: %d.%d.%d\n", __GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__);
+	
 	// Loop over powers
-	#pragma omp parallel 
-	{
-		#pragma omp single 
-		{
-			#pragma omp taskloop reduction (+:increment) shared(data, str_func_ser) private(Nx, Ny, Nz, tmp1, tmp2, indx, Max_Incr)
+	// #pragma omp parallel num_threads(num_threads) shared(data, str_func_ser) private(Nx, Ny, Nz, tmp1, tmp2, indx, Max_Incr)
+	// {
+	// 	#pragma omp single 
+	// 	{
+	// 		#pragma omp taskloop reduction(+:increment) 
 			for (int p = 1; p <= NUM_POW; ++p) {
-			// Loop over increments
-			for (int r = 1; r <= Max_Incr; ++r) {
-				// Initialize increment
-				increment = 0.0;
+				// Loop over increments
+				for (int r = 1; r <= Max_Incr; ++r) {
+					// Initialize increment
+					increment = 0.0;
 
-				// Loop over space
-				for (int i = 0; i < Nz; ++i) {
-					tmp1 = i * Ny;
-					for (int j = 0; j < Ny; ++j) {
-						tmp2 = Nx * (tmp1 + j);
-						for (int k = 0; k < Nx; ++k) {
-							indx = tmp2 + k;
+					// Loop over space
+					for (int i = 0; i < Nz; ++i) {
+						tmp1 = i * Ny;
+						for (int j = 0; j < Ny; ++j) {
+							tmp2 = Nx * (tmp1 + j);
+							for (int k = 0; k < Nx; ++k) {
+								indx = tmp2 + k;
 
-							// Compute increments
-							increment += pow(data[SYS_DIM * (Nx * (i * Ny + j) + ((k + r) % Nx)) + 0]  - data[SYS_DIM * indx + 0], p);
-							increment += pow(data[SYS_DIM * (Nx * (i * Ny + ((j + r) % Ny)) + Nx) + 1] - data[SYS_DIM * indx + 1], p);
-							increment += pow(data[SYS_DIM * (Nx * (((i + r) % Nz) * Ny + j) + k) + 2]  - data[SYS_DIM * indx + 2], p);
+								// Compute increments
+								increment += pow(data[SYS_DIM * (Nx * (i * Ny + j) + ((k + r) % Nx)) + 0]  - data[SYS_DIM * indx + 0], p);
+								increment += pow(data[SYS_DIM * (Nx * (i * Ny + ((j + r) % Ny)) + Nx) + 1] - data[SYS_DIM * indx + 1], p);
+								increment += pow(data[SYS_DIM * (Nx * (((i + r) % Nz) * Ny + j) + k) + 2]  - data[SYS_DIM * indx + 2], p);
+							}
 						}
 					}
-				}
 
-				// Update structure function
-				str_func_ser[p - 1][r - 1] = increment; 
+					// Update structure function
+					str_func_ser[p - 1][r - 1] = increment; 
 				}
 			}
-		} 
-	}
+	// 	} 
+	// }
 
 
 	for (int p = 1; p <= NUM_POW; ++p) {
