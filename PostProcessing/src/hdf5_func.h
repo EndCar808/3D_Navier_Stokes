@@ -18,10 +18,6 @@
 hid_t CreateComplexDatatype(void);
 void OpenInputAndInitialize(void);
 void ReadInData(int snap_indx);
-// void OpenOutputFile(void);
-// void WriteDataToFile(double t, long int snap);
-// hid_t CreateGroup(hid_t file_handle, char* filename, char* group_name, double t, long int snap);
-// void FinalWriteAndClose(void);
 // ---------------------------------------------------------------------
 //  End of File
 // ---------------------------------------------------------------------

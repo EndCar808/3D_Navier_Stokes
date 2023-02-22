@@ -1,25 +1,25 @@
 /**
-* @file hdf5_funcs.h  
+* @file utils.h
 * @author Enda Carroll
 * @date Feb 2023
-* @brief File containing function prototpyes for stats file
+* @brief Header file for the utils.c file
 */
 // ---------------------------------------------------------------------
 //  Standard Libraries and Headers
 // ---------------------------------------------------------------------
 
+
 // ---------------------------------------------------------------------
 //  User Libraries and Headers
 // ---------------------------------------------------------------------
 
+
+
 // ---------------------------------------------------------------------
-//  Function Prototpyes
+//  Function Prototypes
 // ---------------------------------------------------------------------
-void AllocateStatsObjects(void);
-void FreeStatsObjects(void);
-void Precompute(void);
-void ComputeStats(int s);
-void WriteStatsData(const int snap, int indx);
-// ---------------------------------------------------------------------
+int GetCMLArgs(int argc, char** argv);
+void PrintTime(double start, double end);
+// ---------------------------------------------------------------------	
 //  End of File
-// ---------------------------------------------------------------------
+// ---------------------------------------------------------------------	

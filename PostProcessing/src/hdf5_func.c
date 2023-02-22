@@ -46,7 +46,10 @@ void OpenInputAndInitialize(void) {
 	file_info->COMPLEX_DTYPE = CreateComplexDatatype();
 	
 
-	strcpy(file_info->input_dir, "/work/projects/TurbPhase/Phase_Dynamics_Navier_Stokes/Dublin_Results/RESULTS_3D/RESULTS_NAVIER_AB4_N[256][256][256]_T[0-20]_[00-20-12]_[KOLO4_Re_200_N256]/");
+	strcpy(file_info->input_dir, "/work/projects/TurbPhase/Phase_Dynamics_Navier_Stokes/Dublin_Results/RESULTS_3D/RESULTS_NAVIER_AB4_N[256][256][256]_T[0-100]_[11-06-53]_[KOLO4_Re150_N256_contd]/");
+	strcpy(file_info->output_dir, "./Data/Stats/");
+	strcpy(file_info->output_tag, "Test");
+
 
 
 	// --------------------------------

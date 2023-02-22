@@ -49,6 +49,45 @@ int main(int argc, char** argv) {
 	file_info  = &HDF_file_info;
 	stats_data = &statistics_data;
 
+	// --------------------------------
+	//  Begin Timing
+	// --------------------------------
+	// Initialize timing counter
+	clock_t main_begin = omp_get_wtime();
+
+	// --------------------------------
+	//  Get Command Line Arguements
+	// --------------------------------
+	if ((GetCMLArgs(argc, argv)) != 0) {
+		fprintf(stderr, "\n["RED"ERROR"RESET"]: Error in reading in command line aguments, check utils.c file for details\n");
+		exit(1);
+	}
+
+	// --------------------------------
+	//  Initialize Thread Info
+	// --------------------------------
+	// Set the number of threads and get thread IDs
+	omp_set_num_threads(sys_vars->num_threads);
+	#pragma omp parallel
+	{
+		// Get thread id
+		sys_vars->thread_id = omp_get_thread_num();
+
+		// Plot the number of threads
+		if (!(sys_vars->thread_id)) {
+			printf("\nOMP Threads Active: "CYAN"%d"RESET"\n", sys_vars->num_threads);
+		}
+	}
+
+	// Initialize and set threads for fftw plans
+	fftw_init_threads();
+
+	// Set the number of threads for FFTW and print to screen
+	fftw_plan_with_nthreads(sys_vars->num_fftw_threads);
+	printf("\nFFTW Threads: "CYAN"%d"RESET"\n", sys_vars->num_threads);
+
+
+
 	printf("\n\ngcc version: %d.%d.%d\n\n", __GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__);
 
 	
@@ -77,26 +116,58 @@ int main(int argc, char** argv) {
 	InitializeFFTWPlans(sys_vars->N);
 
 	AllocateStatsObjects();
-
-
 	
 	printf("Nx: %d Lx: %lf dx: %lf\nNy: %d Ly: %lf dy: %lf\nNz: %d Lz: %lf dz: %lf\n\n", Nx, Lx, sys_vars->dx, Ny, Ly, sys_vars->dy, Nz, Lz, sys_vars->dz);
 
 	Precompute();
 
-	for (int snap = 0; snap < sys_vars->num_snaps; ++snap) { 
+	int file_indx = 0;
+	int skip = 1;
+	int write = 100;
+	for (int snap = 0; snap < sys_vars->num_snaps; snap+=skip) { 
 
 		printf("Post Step: %d/%ld\n", snap + 1, sys_vars->num_snaps);
 		
 		// Read In Data
 		ReadInData(snap);
 
-		
+		// Compute Stats
+		ComputeStats(snap);
+
+		// Write Data
+		if (snap % write == 0) {
+			WriteStatsData(snap, file_indx);
+			file_indx++;
+		}
 	}
+
+	// Write final state
+	printf("\n\nFinal Write to file...\n");
+	WriteStatsData(sys_vars->num_snaps, sys_vars->num_snaps);
+
 
 	FreeStatsObjects();
 
 	FreeMemoryAndCleanUp();
+
+
+	// --------------------------------
+	//  Clean Up FFTW Objects
+	// --------------------------------
+	// Clean up FFTW Thread Info
+	fftw_cleanup_threads();
+
+	// Clean Up FFTW Plan Objects
+	fftw_cleanup();
+
+	// --------------------------------
+	//  End Timing
+	// --------------------------------
+	// Finish timing
+	clock_t main_end = omp_get_wtime();
+
+	// Print time taken to screen
+	PrintTime(main_begin, main_end);
 
 	return 0;
 }

@@ -73,6 +73,7 @@ typedef struct system_vars_struct {
 	double dy;							// Collocation point spacing in the y direction	
 	double dz;							// Collocation point spacing in the z direction
 	int num_threads;					// The number of OMP threads to use
+	int num_fftw_threads;				// The number of OMP threads to use for DFT
 	int thread_id;						// The ID of the OMP threads
 	int Max_Incr;
 } system_vars_struct;
@@ -110,10 +111,10 @@ typedef struct stats_data_struct {
 
 // HDF5 file info struct
 typedef struct HDF_file_info_struct {
-	char input_file_name[512];		// Array holding input file name
-	char output_file_name[512];     // Output file name array
-	char output_dir[512];			// Output directory
-	char input_dir[512];			// Input directory
+	char input_file_name[1024];		// Array holding input file name
+	char output_file_name[1024];     // Output file name array
+	char output_dir[1024];			// Output directory
+	char input_dir[1024];			// Input directory
 	char output_tag[64]; 			// Tag to be added to the output directory
 	hid_t output_file_handle;		// File handle for the output file 
 	hid_t input_file_handle;		// File handle for the input file 
