@@ -19,7 +19,7 @@
 #include "hdf5_func.h"
 #include "post.h"
 #include "stats.h"
-// #include "utils.h"
+#include "utils.h"
 // #include "str_func.h"
 // ---------------------------------------------------------------------
 //  Global Variables Declarations
@@ -130,6 +130,69 @@ int main(int argc, char** argv) {
 		
 		// Read In Data
 		ReadInData(snap);
+
+		// for (int i = 0; i < 10; ++i) {
+		// 	tmp1 = i * Ny;
+		// 	for (int j = 0; j < 10; ++j) {
+		// 		tmp2 = Nz_Fourier * (tmp1 + j);
+		// 		for (int k = 0; k < 10; ++k) {
+		// 			indx = tmp2 + k;
+
+		// 			printf("%d,%d,%d -what- x: %1.8lf %1.8lf\ty: %1.8lf %1.8lf\tz: %1.8lf %1.8lf\n", i, j, k, 
+		// 													creal(run_data->w_hat_tmp[SYS_DIM * indx + 0]), cimag(run_data->w_hat_tmp[SYS_DIM * indx + 0]), 
+		// 													creal(run_data->w_hat_tmp[SYS_DIM * indx + 1]), cimag(run_data->w_hat_tmp[SYS_DIM * indx + 1]), 
+		// 													creal(run_data->w_hat_tmp[SYS_DIM * indx + 2]), cimag(run_data->w_hat_tmp[SYS_DIM * indx + 2]));
+		// 		}
+		// 	}
+		// }
+
+
+		// for (int i = 0; i < 10; ++i) {
+		// 	tmp1 = i * Ny;
+		// 	for (int j = 0; j < 10; ++j) {
+		// 		tmp2 = Nz_Fourier * (tmp1 + j);
+		// 		for (int k = 0; k < 10; ++k) {
+		// 			indx = tmp2 + k;
+
+		// 			printf("%d,%d,%d -uhat- x: %1.8lf %1.8lf\ty: %1.8lf %1.8lf\tz: %1.8lf %1.8lf\n", i, j, k, 
+		// 													creal(run_data->u_hat[SYS_DIM * indx + 0]), cimag(run_data->u_hat[SYS_DIM * indx + 0]), 
+		// 													creal(run_data->u_hat[SYS_DIM * indx + 1]), cimag(run_data->u_hat[SYS_DIM * indx + 1]), 
+		// 													creal(run_data->u_hat[SYS_DIM * indx + 2]), cimag(run_data->u_hat[SYS_DIM * indx + 2]));
+		// 		}
+		// 	}
+		// }
+
+		// for (int i = 0; i < 10; ++i) {
+		// 	tmp1 = i * Ny;
+		// 	for (int j = 0; j < 10; ++j) {
+		// 		tmp2 = Nz * (tmp1 + j);
+		// 		for (int k = 0; k < 10; ++k) {
+		// 			indx = tmp2 + k;
+
+		// 			printf("%d,%d,%d -u- x: %1.8lf\ty: %1.8lf \tz: %1.8lf\n", i, j, k, 
+		// 													run_data->u[SYS_DIM * indx + 0], 
+		// 													run_data->u[SYS_DIM * indx + 1], 
+		// 													run_data->u[SYS_DIM * indx + 2]);
+		// 		}
+		// 	}
+		// }
+
+		// for (int i = 0; i < 10; ++i) {
+		// 	tmp1 = i * Ny;
+		// 	for (int j = 0; j < 10; ++j) {
+		// 		tmp2 = Nz * (tmp1 + j);
+		// 		for (int k = 0; k < 10; ++k) {
+		// 			indx = tmp2 + k;
+
+		// 			printf("%d,%d,%d -w- x: %1.8lf\ty: %1.8lf \tz: %1.8lf\n", i, j, k, 
+		// 													run_data->w[SYS_DIM * indx + 0], 
+		// 													run_data->w[SYS_DIM * indx + 1], 
+		// 													run_data->w[SYS_DIM * indx + 2]);
+		// 		}
+		// 	}
+		// }
+
+		// exit(1);
 
 		// Compute Stats
 		ComputeStats(snap);

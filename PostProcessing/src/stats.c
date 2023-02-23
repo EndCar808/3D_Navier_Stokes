@@ -77,17 +77,36 @@ void Precompute(void) {
 						r = stats_data->increments[r_indx];
 
 						//------------- Get the longitudinal Velocity increments
-						x_incr_indx = (i + r) % Nx;
-						y_incr_indx = (j + r) % Ny;
-						z_incr_indx = (k + r) % Nz;
-						long_incr_x = run_data->u[SYS_DIM * (Nz * (x_incr_indx * Ny + j) + k) + 0] - run_data->u[SYS_DIM * indx + 0];
-						long_incr_y = run_data->u[SYS_DIM * (Nz * (i * Ny + y_incr_indx) + k) + 1] - run_data->u[SYS_DIM * indx + 1];
-						long_incr_z = run_data->u[SYS_DIM * (Nz * (i * Ny + j) + z_incr_indx) + 2] - run_data->u[SYS_DIM * indx + 2];
+						x_incr_indx = (i + r);
+						if (x_incr_indx < Nx) {
+							long_incr_x = run_data->u[SYS_DIM * (Nz * (x_incr_indx * Ny + j) + k) + 0] - run_data->u[SYS_DIM * indx + 0];
+							gsl_rstat_add(long_incr_x, stats_data->u_incr_stats[0][r_indx]);
+						}
 
-						// Update the stats accumulators
-						gsl_rstat_add(long_incr_x, stats_data->u_incr_stats[0][r_indx]);
-						gsl_rstat_add(long_incr_y, stats_data->u_incr_stats[0][r_indx]);
-						gsl_rstat_add(long_incr_z, stats_data->u_incr_stats[0][r_indx]);
+						y_incr_indx = (j + r);
+						if (y_incr_indx < Ny) {
+							long_incr_y = run_data->u[SYS_DIM * (Nz * (i * Ny + y_incr_indx) + k) + 1] - run_data->u[SYS_DIM * indx + 1];
+							gsl_rstat_add(long_incr_y, stats_data->u_incr_stats[0][r_indx]);
+						}
+
+						z_incr_indx = (k + r);
+						if (z_incr_indx < Nz) {
+							long_incr_z = run_data->u[SYS_DIM * (Nz * (i * Ny + j) + z_incr_indx) + 2] - run_data->u[SYS_DIM * indx + 2];
+							gsl_rstat_add(long_incr_z, stats_data->u_incr_stats[0][r_indx]);
+						}
+
+						// //------------- Get the longitudinal Velocity increments
+						// x_incr_indx = (i + r) % Nx;
+						// y_incr_indx = (j + r) % Ny;
+						// z_incr_indx = (k + r) % Nz;
+						// long_incr_x = run_data->u[SYS_DIM * (Nz * (x_incr_indx * Ny + j) + k) + 0] - run_data->u[SYS_DIM * indx + 0];
+						// long_incr_y = run_data->u[SYS_DIM * (Nz * (i * Ny + y_incr_indx) + k) + 1] - run_data->u[SYS_DIM * indx + 1];
+						// long_incr_z = run_data->u[SYS_DIM * (Nz * (i * Ny + j) + z_incr_indx) + 2] - run_data->u[SYS_DIM * indx + 2];
+
+						// // Update the stats accumulators
+						// gsl_rstat_add(long_incr_x, stats_data->u_incr_stats[0][r_indx]);
+						// gsl_rstat_add(long_incr_y, stats_data->u_incr_stats[0][r_indx]);
+						// gsl_rstat_add(long_incr_z, stats_data->u_incr_stats[0][r_indx]);
 					}
 				}
 			}
@@ -165,30 +184,64 @@ void ComputeStats(int s) {
 					r = stats_data->increments[r_indx];
 
 					//------------- Get the longitudinal Velocity increments
-					x_incr_indx = (i + r) % Nx;
-					y_incr_indx = (j + r) % Ny;
-					z_incr_indx = (k + r) % Nz;
-					long_incr_x = run_data->u[SYS_DIM * (Nz * (x_incr_indx * Ny + j) + k) + 0] - run_data->u[SYS_DIM * indx + 0];
-					long_incr_y = run_data->u[SYS_DIM * (Nz * (i * Ny + y_incr_indx) + k) + 1] - run_data->u[SYS_DIM * indx + 1];
-					long_incr_z = run_data->u[SYS_DIM * (Nz * (i * Ny + j) + z_incr_indx) + 2] - run_data->u[SYS_DIM * indx + 2];
+					x_incr_indx = (i + r);
+					if (x_incr_indx < Nx) {
+						long_incr_x = run_data->u[SYS_DIM * (Nz * (x_incr_indx * Ny + j) + k) + 0] - run_data->u[SYS_DIM * indx + 0];
+						// Update the histograms
+						gsl_status = gsl_histogram_increment(stats_data->u_incr_hist[0][r_indx], long_incr_x);
+						if (gsl_status != 0) {
+							fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to update bin count for ["CYAN"%s"RESET"] for Snap ["CYAN"%d"RESET"] -- GSL Exit Status [Err:"CYAN" %d"RESET" - Val:"CYAN" %lf"RESET"]\n-->> Exiting!!!\n", "Longitudinal Velocity Increment x", s, gsl_status, long_incr_x);
+							exit(1);
+						}
+					}
+
+					y_incr_indx = (j + r);
+					if (y_incr_indx < Ny) {
+						long_incr_y = run_data->u[SYS_DIM * (Nz * (i * Ny + y_incr_indx) + k) + 1] - run_data->u[SYS_DIM * indx + 1];
+						gsl_status = gsl_histogram_increment(stats_data->u_incr_hist[0][r_indx], long_incr_y);
+						if (gsl_status != 0) {
+							fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to update bin count for ["CYAN"%s"RESET"] for Snap ["CYAN"%d"RESET"] -- GSL Exit Status [Err:"CYAN" %d"RESET" - Val:"CYAN" %lf"RESET"]\n-->> Exiting!!!\n", "Longitudinal Velocity Increment y", s, gsl_status, long_incr_y);
+							exit(1);
+						}
+					}
+
+					z_incr_indx = (k + r);
+					if (z_incr_indx < Nz) {
+						long_incr_z = run_data->u[SYS_DIM * (Nz * (i * Ny + j) + z_incr_indx) + 2] - run_data->u[SYS_DIM * indx + 2];
+						gsl_status = gsl_histogram_increment(stats_data->u_incr_hist[0][r_indx], long_incr_z);
+						if (gsl_status != 0) {
+							fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to update bin count for ["CYAN"%s"RESET"] for Snap ["CYAN"%d"RESET"] -- GSL Exit Status [Err:"CYAN" %d"RESET" - Val:"CYAN" %lf"RESET"]\n-->> Exiting!!!\n", "Longitudinal Velocity Increment z", s, gsl_status, long_incr_z);
+							exit(1);
+						}
+					}
+
+
+
+
+					// x_incr_indx = (i + r) % Nx;
+					// y_incr_indx = (j + r) % Ny;
+					// z_incr_indx = (k + r) % Nz;
+					// long_incr_x = run_data->u[SYS_DIM * (Nz * (x_incr_indx * Ny + j) + k) + 0] - run_data->u[SYS_DIM * indx + 0];
+					// long_incr_y = run_data->u[SYS_DIM * (Nz * (i * Ny + y_incr_indx) + k) + 1] - run_data->u[SYS_DIM * indx + 1];
+					// long_incr_z = run_data->u[SYS_DIM * (Nz * (i * Ny + j) + z_incr_indx) + 2] - run_data->u[SYS_DIM * indx + 2];
 
 			
-					// Update the histograms
-					gsl_status = gsl_histogram_increment(stats_data->u_incr_hist[0][r_indx], long_incr_x);
-					if (gsl_status != 0) {
-						fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to update bin count for ["CYAN"%s"RESET"] for Snap ["CYAN"%d"RESET"] -- GSL Exit Status [Err:"CYAN" %d"RESET" - Val:"CYAN" %lf"RESET"]\n-->> Exiting!!!\n", "Longitudinal Velocity Increment x", s, gsl_status, long_incr_x);
-						exit(1);
-					}
-					gsl_status = gsl_histogram_increment(stats_data->u_incr_hist[0][r_indx], long_incr_y);
-					if (gsl_status != 0) {
-						fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to update bin count for ["CYAN"%s"RESET"] for Snap ["CYAN"%d"RESET"] -- GSL Exit Status [Err:"CYAN" %d"RESET" - Val:"CYAN" %lf"RESET"]\n-->> Exiting!!!\n", "Longitudinal Velocity Increment y", s, gsl_status, long_incr_y);
-						exit(1);
-					}
-					gsl_status = gsl_histogram_increment(stats_data->u_incr_hist[0][r_indx], long_incr_z);
-					if (gsl_status != 0) {
-						fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to update bin count for ["CYAN"%s"RESET"] for Snap ["CYAN"%d"RESET"] -- GSL Exit Status [Err:"CYAN" %d"RESET" - Val:"CYAN" %lf"RESET"]\n-->> Exiting!!!\n", "Longitudinal Velocity Increment z", s, gsl_status, long_incr_z);
-						exit(1);
-					}
+					// // Update the histograms
+					// gsl_status = gsl_histogram_increment(stats_data->u_incr_hist[0][r_indx], long_incr_x);
+					// if (gsl_status != 0) {
+					// 	fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to update bin count for ["CYAN"%s"RESET"] for Snap ["CYAN"%d"RESET"] -- GSL Exit Status [Err:"CYAN" %d"RESET" - Val:"CYAN" %lf"RESET"]\n-->> Exiting!!!\n", "Longitudinal Velocity Increment x", s, gsl_status, long_incr_x);
+					// 	exit(1);
+					// }
+					// gsl_status = gsl_histogram_increment(stats_data->u_incr_hist[0][r_indx], long_incr_y);
+					// if (gsl_status != 0) {
+					// 	fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to update bin count for ["CYAN"%s"RESET"] for Snap ["CYAN"%d"RESET"] -- GSL Exit Status [Err:"CYAN" %d"RESET" - Val:"CYAN" %lf"RESET"]\n-->> Exiting!!!\n", "Longitudinal Velocity Increment y", s, gsl_status, long_incr_y);
+					// 	exit(1);
+					// }
+					// gsl_status = gsl_histogram_increment(stats_data->u_incr_hist[0][r_indx], long_incr_z);
+					// if (gsl_status != 0) {
+					// 	fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to update bin count for ["CYAN"%s"RESET"] for Snap ["CYAN"%d"RESET"] -- GSL Exit Status [Err:"CYAN" %d"RESET" - Val:"CYAN" %lf"RESET"]\n-->> Exiting!!!\n", "Longitudinal Velocity Increment z", s, gsl_status, long_incr_z);
+					// 	exit(1);
+					// }
 				}
 			}
 		}

@@ -46,9 +46,10 @@ void OpenInputAndInitialize(void) {
 	file_info->COMPLEX_DTYPE = CreateComplexDatatype();
 	
 
-	strcpy(file_info->input_dir, "/work/projects/TurbPhase/Phase_Dynamics_Navier_Stokes/Dublin_Results/RESULTS_3D/RESULTS_NAVIER_AB4_N[256][256][256]_T[0-100]_[11-06-53]_[KOLO4_Re150_N256_contd]/");
+	strcpy(file_info->input_dir, "/work/projects/TurbPhase/Phase_Dynamics_Navier_Stokes/Dublin_Results/RESULTS_3D/RESULTS_NAVIER_AB4_N[256][256][256]_T[0-20]_[00-20-27]_[ORNU_H256]/");
+	// strcpy(file_info->input_dir, "/work/projects/TurbPhase/Phase_Dynamics_Navier_Stokes/Dublin_Results/RESULTS_3D/RESULTS_NAVIER_AB4_N[256][256][256]_T[0-100]_[11-06-55]_[KOLO4_Re200_N256_contd]/");
 	strcpy(file_info->output_dir, "./Data/Stats/");
-	strcpy(file_info->output_tag, "Test");
+	strcpy(file_info->output_tag, "TestAlt");
 
 
 
@@ -260,6 +261,7 @@ void ReadInData(int snap_indx) {
 			for (int k = 0; k < Nz_Fourier; ++k) {
 				indx = tmp2 + k;
 
+				// Compute the Fourier velocity (store in temp array for transform)
 				if (run_data->k[0][i] == 0 && run_data->k[1][j] == 0 && run_data->k[2][k] == 0) {
 					// Get the zero mode
 					run_data->u_hat_tmp[SYS_DIM * indx + 0] = 0.0 + 0.0 * I;
@@ -274,26 +276,18 @@ void ReadInData(int snap_indx) {
 					run_data->u_hat_tmp[SYS_DIM * indx + 1] = I * (1.0 / k_fac) * (run_data->k[2][k] * run_data->w_hat_tmp[SYS_DIM * indx + 0] - run_data->k[0][i] * run_data->w_hat_tmp[SYS_DIM * indx + 2]);
 					run_data->u_hat_tmp[SYS_DIM * indx + 2] = I * (1.0 / k_fac) * (run_data->k[0][i] * run_data->w_hat_tmp[SYS_DIM * indx + 1] - run_data->k[1][j] * run_data->w_hat_tmp[SYS_DIM * indx + 0]);	
 				}
+
+				// Write it to the array
+				run_data->u_hat[SYS_DIM * indx + 0] = run_data->u_hat_tmp[SYS_DIM * indx + 0];
+				run_data->u_hat[SYS_DIM * indx + 1] = run_data->u_hat_tmp[SYS_DIM * indx + 1];
+				run_data->u_hat[SYS_DIM * indx + 2] = run_data->u_hat_tmp[SYS_DIM * indx + 2];
 			}
 		}
 	}
 
 	// Transform back to real space
 	fftw_execute_dft_c2r(sys_vars->fftw_3d_dft_batch_c2r, run_data->u_hat_tmp, run_data->u);
-	for (int i = 0; i < Nx; ++i) {
-		tmp1 = i * Ny;
-		for (int j = 0; j < Ny; ++j) {
-			tmp2 = Nz_Fourier * (tmp1 + j);
-			for (int k = 0; k < Nz_Fourier; ++k) {
-				indx = tmp2 + k;
-
-				// Normalize the velocity
-				for (int s = 0; s < SYS_DIM; ++s) {
-					run_data->u[SYS_DIM * indx + s] /= (Nx * Ny * Nz);
-				}
-			}
-		}
-	}
+	// fftw_execute_dft_c2r(sys_vars->fftw_3d_dft_batch_c2r, run_data->w_hat_tmp, run_data->w);
 
 	// --------------------------------
 	//  Close HDF5 Identifiers
