@@ -87,10 +87,9 @@ int main(int argc, char** argv) {
 	printf("\nFFTW Threads: "CYAN"%d"RESET"\n", sys_vars->num_threads);
 
 
-
-	printf("\n\ngcc version: %d.%d.%d\n\n", __GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__);
-
-	
+	// --------------------------------
+	// Open Input File 
+	// --------------------------------
 	OpenInputAndInitialize();
 
 
@@ -111,92 +110,41 @@ int main(int argc, char** argv) {
 
 
 
+	// --------------------------------
+	// Allocate and Initialize Memory 
+	// --------------------------------
 	AllocateMemory(sys_vars->N);
 
 	InitializeFFTWPlans(sys_vars->N);
 
 	AllocateStatsObjects();
-	
-	printf("Nx: %d Lx: %lf dx: %lf\nNy: %d Ly: %lf dy: %lf\nNz: %d Lz: %lf dz: %lf\n\n", Nx, Lx, sys_vars->dx, Ny, Ly, sys_vars->dy, Nz, Lz, sys_vars->dz);
-
+	// --------------------------------
+	// Loop Through Data To Precompute 
+	// --------------------------------
 	Precompute();
 
+	// Initialize quatities
 	int file_indx = 0;
 	int skip = 1;
 	int write = 100;
 	for (int snap = 0; snap < sys_vars->num_snaps; snap+=skip) { 
 
+		// Print Update to screen
 		printf("Post Step: %d/%ld\n", snap + 1, sys_vars->num_snaps);
 		
+		// --------------------------------
 		// Read In Data
+		// --------------------------------
 		ReadInData(snap);
 
-		// for (int i = 0; i < 10; ++i) {
-		// 	tmp1 = i * Ny;
-		// 	for (int j = 0; j < 10; ++j) {
-		// 		tmp2 = Nz_Fourier * (tmp1 + j);
-		// 		for (int k = 0; k < 10; ++k) {
-		// 			indx = tmp2 + k;
-
-		// 			printf("%d,%d,%d -what- x: %1.8lf %1.8lf\ty: %1.8lf %1.8lf\tz: %1.8lf %1.8lf\n", i, j, k, 
-		// 													creal(run_data->w_hat_tmp[SYS_DIM * indx + 0]), cimag(run_data->w_hat_tmp[SYS_DIM * indx + 0]), 
-		// 													creal(run_data->w_hat_tmp[SYS_DIM * indx + 1]), cimag(run_data->w_hat_tmp[SYS_DIM * indx + 1]), 
-		// 													creal(run_data->w_hat_tmp[SYS_DIM * indx + 2]), cimag(run_data->w_hat_tmp[SYS_DIM * indx + 2]));
-		// 		}
-		// 	}
-		// }
-
-
-		// for (int i = 0; i < 10; ++i) {
-		// 	tmp1 = i * Ny;
-		// 	for (int j = 0; j < 10; ++j) {
-		// 		tmp2 = Nz_Fourier * (tmp1 + j);
-		// 		for (int k = 0; k < 10; ++k) {
-		// 			indx = tmp2 + k;
-
-		// 			printf("%d,%d,%d -uhat- x: %1.8lf %1.8lf\ty: %1.8lf %1.8lf\tz: %1.8lf %1.8lf\n", i, j, k, 
-		// 													creal(run_data->u_hat[SYS_DIM * indx + 0]), cimag(run_data->u_hat[SYS_DIM * indx + 0]), 
-		// 													creal(run_data->u_hat[SYS_DIM * indx + 1]), cimag(run_data->u_hat[SYS_DIM * indx + 1]), 
-		// 													creal(run_data->u_hat[SYS_DIM * indx + 2]), cimag(run_data->u_hat[SYS_DIM * indx + 2]));
-		// 		}
-		// 	}
-		// }
-
-		// for (int i = 0; i < 10; ++i) {
-		// 	tmp1 = i * Ny;
-		// 	for (int j = 0; j < 10; ++j) {
-		// 		tmp2 = Nz * (tmp1 + j);
-		// 		for (int k = 0; k < 10; ++k) {
-		// 			indx = tmp2 + k;
-
-		// 			printf("%d,%d,%d -u- x: %1.8lf\ty: %1.8lf \tz: %1.8lf\n", i, j, k, 
-		// 													run_data->u[SYS_DIM * indx + 0], 
-		// 													run_data->u[SYS_DIM * indx + 1], 
-		// 													run_data->u[SYS_DIM * indx + 2]);
-		// 		}
-		// 	}
-		// }
-
-		// for (int i = 0; i < 10; ++i) {
-		// 	tmp1 = i * Ny;
-		// 	for (int j = 0; j < 10; ++j) {
-		// 		tmp2 = Nz * (tmp1 + j);
-		// 		for (int k = 0; k < 10; ++k) {
-		// 			indx = tmp2 + k;
-
-		// 			printf("%d,%d,%d -w- x: %1.8lf\ty: %1.8lf \tz: %1.8lf\n", i, j, k, 
-		// 													run_data->w[SYS_DIM * indx + 0], 
-		// 													run_data->w[SYS_DIM * indx + 1], 
-		// 													run_data->w[SYS_DIM * indx + 2]);
-		// 		}
-		// 	}
-		// }
-
-		// exit(1);
-
+		// --------------------------------
 		// Compute Stats
+		// --------------------------------
 		ComputeStats(snap);
 
+		// --------------------------------
+		//  Write State Periodically
+		// --------------------------------
 		// Write Data
 		if (snap % write == 0) {
 			WriteStatsData(snap, file_indx);
@@ -204,13 +152,21 @@ int main(int argc, char** argv) {
 		}
 	}
 
+	// --------------------------------
+	//  Write Final State
+	// --------------------------------
 	// Write final state
 	printf("\n\nFinal Write to file...\n");
 	WriteStatsData(sys_vars->num_snaps, sys_vars->num_snaps);
 
 
+	// --------------------------------
+	//  Free Memory
+	// --------------------------------
+	// Free stats objects
 	FreeStatsObjects();
 
+	// Free other memory
 	FreeMemoryAndCleanUp();
 
 

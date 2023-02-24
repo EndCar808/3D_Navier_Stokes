@@ -15,6 +15,7 @@
 #include <unistd.h>	
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <libgen.h>
 // ---------------------------------------------------------------------
 //  User Libraries and Headers
 // ---------------------------------------------------------------------
@@ -38,6 +39,8 @@ void OpenInputAndInitialize(void) {
 	hsize_t Dims[SYS_DIM + 1];
 	int snaps = 0;
 	char group_string[64];
+	struct stat st = {0};	// this is used to check whether the output directories exist or not.
+	char input_dir_cp[1024];
 
 	// --------------------------------
 	//  Create Complex Datatype
@@ -49,6 +52,14 @@ void OpenInputAndInitialize(void) {
 	// --------------------------------
 	//  Create Output Directory
 	// --------------------------------
+	// Get the basename of the input directory
+	strcpy(input_dir_cp, file_info->input_dir);
+	char* in_base_name = basename(input_dir_cp);
+
+	// Construct output path 
+	strcat(file_info->output_dir, in_base_name);
+	printf("\nOutput Directory: "CYAN"%s"RESET"\n\n", file_info->output_dir);
+
 	// Check if folder exists
 	if (stat(file_info->output_dir, &st) == -1) {
 		// If not create it
@@ -58,17 +69,16 @@ void OpenInputAndInitialize(void) {
 		}
 	}
 
-
 	// --------------------------------
 	//  Get Input File Path
 	// --------------------------------
 	if (strcmp(file_info->input_dir, "NONE") != 0) {
 		// If input folder construct input file path
 		strcpy(file_info->input_file_name, file_info->input_dir);
-		strcat(file_info->input_file_name, "HDF_Global_FOURIER.h5");
+		strcat(file_info->input_file_name, "/HDF_Global_FOURIER.h5");
 
 		// Print input file path to screen
-		printf("\nInput File: "CYAN"%s"RESET"\n\n", file_info->input_file_name);
+		printf("\nInput File: "CYAN"%s"RESET"\n", file_info->input_file_name);
 	}
 	else {
 		fprintf(stderr, "\n["RED"ERROR"RESET"] --- No input directory/file provided. Please provide input directory/file - see utils.c\n-->> Exiting...\n");

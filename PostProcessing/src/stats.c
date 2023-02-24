@@ -274,7 +274,7 @@ void WriteStatsData(const int snap, int indx) {
     if (strcmp(file_info->output_dir, "NONE") != 0) {
     	// Construct pathh
     	strcpy(file_info->output_file_name, file_info->output_dir);
-    	sprintf(file_name, "Stats_HDF_Data_TAG[%s-%d].h5", file_info->output_tag, indx);
+    	sprintf(file_name, "/Stats_HDF_Data_TAG[%s-%d].h5", file_info->output_tag, indx);
     	strcat(file_info->output_file_name, file_name);
 
     	// Print output file path to screen
