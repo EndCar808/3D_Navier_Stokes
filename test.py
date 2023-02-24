@@ -1,7 +1,7 @@
 import numpy as np 
 import h5py as h5
-from numba import njit
 from matplotlib import pyplot as plt
+from numba import njit
 import scipy as scp
 import numpy.fft as fft
 import pyfftw.interfaces.numpy_fft as fftw

@@ -1,5 +1,7 @@
 import numpy as np 
 import h5py as h5
+import sys
+import getopt
 import matplotlib as mpl
 if mpl.__version__ > '2':    
        mpl.rcParams['text.usetex'] = True

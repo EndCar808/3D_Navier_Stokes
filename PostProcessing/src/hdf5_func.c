@@ -46,11 +46,17 @@ void OpenInputAndInitialize(void) {
 	file_info->COMPLEX_DTYPE = CreateComplexDatatype();
 	
 
-	strcpy(file_info->input_dir, "/work/projects/TurbPhase/Phase_Dynamics_Navier_Stokes/Dublin_Results/RESULTS_3D/RESULTS_NAVIER_AB4_N[256][256][256]_T[0-20]_[00-20-27]_[ORNU_H256]/");
-	// strcpy(file_info->input_dir, "/work/projects/TurbPhase/Phase_Dynamics_Navier_Stokes/Dublin_Results/RESULTS_3D/RESULTS_NAVIER_AB4_N[256][256][256]_T[0-100]_[11-06-55]_[KOLO4_Re200_N256_contd]/");
-	strcpy(file_info->output_dir, "./Data/Stats/");
-	strcpy(file_info->output_tag, "TestAlt");
-
+	// --------------------------------
+	//  Create Output Directory
+	// --------------------------------
+	// Check if folder exists
+	if (stat(file_info->output_dir, &st) == -1) {
+		// If not create it
+		if ((mkdir(file_info->output_dir, 0700)) == -1) {
+			fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to create folder for output files ["CYAN"%s"RESET"]\n-->> Exiting...\n", file_info->output_dir);
+			exit(1);
+		}
+	}
 
 
 	// --------------------------------
