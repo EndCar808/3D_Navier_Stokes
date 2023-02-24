@@ -39,10 +39,10 @@ void OpenInputAndInitialize(void) {
 	int snaps = 0;
 	char group_string[64];
 
-	// // --------------------------------
-	// //  Create Complex Datatype
-	// // --------------------------------
-	// // Create compound datatype for the complex datasets
+	// --------------------------------
+	//  Create Complex Datatype
+	// --------------------------------
+	// Create compound datatype for the complex datasets
 	file_info->COMPLEX_DTYPE = CreateComplexDatatype();
 	
 

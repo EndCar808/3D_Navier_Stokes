@@ -47,7 +47,7 @@
 #define SYS_DIM 3 				// The system dimension i.e., 3D
 // Statistics definitions
 #define N_BINS 1000				// The number of histogram bins to use
-#define NUM_INCR 5              // The number of increment length scales
+#define NUM_INCR 9              // The number of increment length scales
 #define INCR_TYPES 1 			// The number of increment directions i.e., longitudinal and transverse
 #define BIN_LIM 40              // The limit of the bins for the velocity increments
 #define NUM_POW 6               // The number of powers for the str function

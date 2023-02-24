@@ -391,7 +391,7 @@ void AllocateStatsObjects(void) {
 
 	// Set up increments array
 	stats_data->increments = (int* )fftw_malloc(sizeof(int) * NUM_INCR);
-	int increment[NUM_INCR] = {1, 2, 4, 16, Max_Incr};
+	int increment[NUM_INCR] = {1, 2, 4, 8, 16, 32, 64, 128, Max_Incr};
 	memcpy(stats_data->increments, increment, sizeof(increment));
 
 
