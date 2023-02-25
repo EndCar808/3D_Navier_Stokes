@@ -133,7 +133,7 @@ if __name__ == "__main__":
 	plt.figure()
 
 	num_incrs = u_incr_hist.shape[0]
-	colors    = plt.cm.magma(np.linspace(0, 1, num_incrs))
+	colors    = plt.cm.magma(np.linspace(0, 0.75, num_incrs))
 
 	for r in range(num_incrs):
 		
@@ -148,7 +148,7 @@ if __name__ == "__main__":
 	plt.ylabel(r"$\sigma$ PDF")
 	plt.legend()
 	plt.xlabel(r"$\delta_{\parallel}\mathbf{u} / \sigma$")
-	plt.savefig(cmdargs.out_dir + "PDF_c_COMBINED.png".format(r))
+	plt.savefig(cmdargs.out_dir + "/PDF_c_COMBINED.png".format(r))
 	plt.close()
 
 	# Plot the individual PDFs
@@ -163,6 +163,6 @@ if __name__ == "__main__":
 		plt.ylabel(r"PDF")
 		plt.legend()
 		plt.xlabel(r"$\delta_{\parallel}\mathbf{u}$")
-		plt.savefig(cmdargs.out_dir + "PDF_c_r{}.png".format(r))
+		plt.savefig(cmdargs.out_dir + "/PDF_c_r{}.png".format(r))
 		plt.close()
 
