@@ -2,6 +2,8 @@ import numpy as np
 import h5py as h5
 import sys
 import getopt
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib as mpl
 if mpl.__version__ > '2':    
        mpl.rcParams['text.usetex'] = True
@@ -130,7 +132,8 @@ if __name__ == "__main__":
 		u_incr_ranges = f["LongitudinalVelIncrements_BinRanges"][:, :]
 
 	# Plot the PDFs combined on one plot
-	plt.figure()
+	text_width=12.25
+	plt.figure(figsize=(text_width, 1.5 * text_width))
 
 	num_incrs = u_incr_hist.shape[0]
 	colors    = plt.cm.magma(np.linspace(0, 0.75, num_incrs))
@@ -141,28 +144,30 @@ if __name__ == "__main__":
 
 		pdf, bin_centres, _ = compute_pdf(u_incr_hist[r, :], u_incr_ranges[r, :], normed = True, remove_zeros = True)
 		if r == (num_incrs - 1):
-			plt.plot(bin_centres, pdf / 10**r, label=r"$r_{max} = \pi / N$", color = colors[r])
+			plt.plot(bin_centres, pdf / 12**r, label=r"$r_{max} = \pi / N$", color = colors[r])
 		else:
-			plt.plot(bin_centres, pdf / 10**r, label=r"$r_{} = {}\Delta x$".format(r, 2**r), color = colors[r])
+			plt.plot(bin_centres, pdf / 12**r, label=r"$r_{} = {}\Delta x$".format(r, 2**r), color = colors[r])
 	plt.yscale('log')
 	plt.ylabel(r"$\sigma$ PDF")
+	plt.xlim(-27.5, 25)
+	plt.grid()
 	plt.legend()
 	plt.xlabel(r"$\delta_{\parallel}\mathbf{u} / \sigma$")
 	plt.savefig(cmdargs.out_dir + "/PDF_c_COMBINED.png".format(r))
 	plt.close()
 
-	# Plot the individual PDFs
-	for r in range(u_incr_hist.shape[0]):
+	# # Plot the individual PDFs
+	# for r in range(u_incr_hist.shape[0]):
 		
-		print("Plotting C Data {}".format(r))
+	# 	print("Plotting C Data {}".format(r))
 
-		plt.figure()
-		pdf, bin_centres, _ = compute_pdf(u_incr_hist[r, :], u_incr_ranges[r, :])
-		plt.plot(bin_centres, pdf, label=r"$r = {}$".format(r))
-		plt.yscale('log')
-		plt.ylabel(r"PDF")
-		plt.legend()
-		plt.xlabel(r"$\delta_{\parallel}\mathbf{u}$")
-		plt.savefig(cmdargs.out_dir + "/PDF_c_r{}.png".format(r))
-		plt.close()
+	# 	plt.figure()
+	# 	pdf, bin_centres, _ = compute_pdf(u_incr_hist[r, :], u_incr_ranges[r, :])
+	# 	plt.plot(bin_centres, pdf, label=r"$r = {}$".format(r))
+	# 	plt.yscale('log')
+	# 	plt.ylabel(r"PDF")
+	# 	plt.legend()
+	# 	plt.xlabel(r"$\delta_{\parallel}\mathbf{u}$")
+	# 	plt.savefig(cmdargs.out_dir + "/PDF_c_r{}.png".format(r))
+	# 	plt.close()
 

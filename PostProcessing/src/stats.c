@@ -265,6 +265,8 @@ void WriteStatsData(const int snap, int indx) {
 	hsize_t dset_dims_2d[Dims2D];
 	static const hsize_t Dims3D = 3;
     hsize_t dset_dims_3d[Dims3D];
+	static const hsize_t Dims4D = 4;
+	hsize_t dset_dims_4d[Dims4D];
 
 
 
@@ -370,6 +372,22 @@ void WriteStatsData(const int snap, int indx) {
     fftw_free(vel_inc_range);
     fftw_free(vel_inc_counts);
 
+
+    // -------------------------------
+    // Write Real Space Vorticity
+    // -------------------------------
+    // Transform the vorticity back to real space
+    fftw_execute_dft_c2r(sys_vars->fftw_3d_dft_batch_c2r, run_data->w_hat_tmp, run_data->w);
+   	
+   	dset_dims_4d[0] = sys_vars->N[0];
+	dset_dims_4d[1] = sys_vars->N[1];
+	dset_dims_4d[2] = sys_vars->N[2];
+	dset_dims_4d[3] = 3;
+	status = H5LTmake_dataset(file_info->output_file_handle, "Vorticity", Dims4D, dset_dims_4d, H5T_NATIVE_DOUBLE, run_data->w);	
+	if (status < 0) {
+        fprintf(stderr, "\n["RED"ERROR"RESET"] --- Unable to write ["CYAN"%s"RESET"] to file at: Snap = ["CYAN"%d"RESET"]\n-->> Exiting...\n", "Vorticity", snap);
+        exit(1);
+    }
 
     // --------------------------------
 	//  Close HDF5 Identifiers

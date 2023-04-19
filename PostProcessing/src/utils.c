@@ -111,7 +111,7 @@ int GetCMLArgs(int argc, char** argv) {
  * @param start The wall time at the start of timing
  * @param end   The wall time at the end of timing
  */
-void PrintTime(time_t start, time_t end) {
+void PrintTime(double start, double end) {
 
     // Get time spent in seconds
     double time_spent = (double)(end - start);

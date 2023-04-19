@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
 	//  Begin Timing
 	// --------------------------------
 	// Initialize timing counter
-	clock_t main_begin = omp_get_wtime();
+	double main_begin = omp_get_wtime();
 
 	// --------------------------------
 	//  Get Command Line Arguements
@@ -84,7 +84,7 @@ int main(int argc, char** argv) {
 
 	// Set the number of threads for FFTW and print to screen
 	fftw_plan_with_nthreads(sys_vars->num_fftw_threads);
-	printf("\nFFTW Threads: "CYAN"%d"RESET"\n", sys_vars->num_threads);
+	printf("\nFFTW Threads: "CYAN"%d"RESET"\n", sys_vars->num_fftw_threads);
 
 
 	// --------------------------------
@@ -121,7 +121,7 @@ int main(int argc, char** argv) {
 	// --------------------------------
 	// Loop Through Data To Precompute 
 	// --------------------------------
-	Precompute();
+	// Precompute();
 
 	// Initialize quatities
 	int file_indx = 0;
@@ -140,7 +140,7 @@ int main(int argc, char** argv) {
 		// --------------------------------
 		// Compute Stats
 		// --------------------------------
-		ComputeStats(snap);
+		// ComputeStats(snap);
 
 		// --------------------------------
 		//  Write State Periodically
@@ -183,9 +183,10 @@ int main(int argc, char** argv) {
 	//  End Timing
 	// --------------------------------
 	// Finish timing
-	clock_t main_end = omp_get_wtime();
+	double main_end = omp_get_wtime();
 
 	// Print time taken to screen
+	printf("\n\nTime: %lf\n\n", main_end - main_begin);
 	PrintTime(main_begin, main_end);
 
 	return 0;
